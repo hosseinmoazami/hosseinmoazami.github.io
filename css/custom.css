@@ -1,0 +1,11 @@
+.text-align-right {
+    text-align: right;
+}
+
+.float-left { 
+    float: left;
+}
+
+.direction-ltr {
+    direction: ltr;
+}
