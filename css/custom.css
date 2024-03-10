@@ -1,11 +1,7 @@
-.text-align-right {
-    text-align: right;
-}
-
-.float-left { 
-    float: left;
-}
-
-.direction-ltr {
-    direction: ltr;
+.separator {
+  width: -webkit-fill-available;
+  height: 1px;
+  background-color: white;
+  display: inline-block;
+  vertical-align: middle;
 }
