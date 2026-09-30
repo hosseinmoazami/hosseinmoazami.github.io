@@ -1,0 +1,68 @@
+# OS and editors
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Local AI and tooling metadata
+.agents/
+.codex/
+
+# Secrets and local configuration
+.env
+.env.*
+!.env.example
+.npmrc
+.pypirc
+.netrc
+.secrets/
+secrets.*
+!secrets.example
+credentials*.json
+service-account*.json
+*.pem
+*.key
+*.p12
+*.pfx
+*.jks
+*.keystore
+id_rsa*
+id_ed25519*
+
+# Infrastructure state and credentials
+.terraform/
+terraform.tfstate*
+*.tfvars
+.aws/
+.kube/
+kubeconfig*
+
+# Dependencies, caches, logs, and temporary files
+node_modules/
+.cache/
+.pytest_cache/
+__pycache__/
+*.py[cod]
+coverage/
+.coverage
+*.log
+/build/
+/dist/
+/tmp/
+
+# Local or private project artifacts
+/output/email/
+/output/rendered/
+/IMPROVEMENTS.md
+/input/
+/private/
+/Profile.pdf
+/resume-v2.pdf
+*.db
+*.sqlite
+*.sqlite3
+
+# GitHub Actions are intentionally unused
+/.github/workflows/

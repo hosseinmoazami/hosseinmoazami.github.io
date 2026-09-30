@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A repeatable incident workflow connecting service-level metrics, deployments, structured logs, and traces."><meta name="author" content="Hossein Moazami"><meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/blog/posts/a-repeatable-path-from-alert-to-cause.html">
+  <meta property="og:type" content="article"><meta property="og:title" content="A repeatable path from alert to cause"><meta property="og:description" content="A practical incident workflow connecting metrics, changes, logs, traces, mitigation, and recovery."><meta property="og:url" content="https://hossein.cloud/blog/posts/a-repeatable-path-from-alert-to-cause.html"><meta property="og:image" content="https://hossein.cloud/assets/og-card.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer"><meta property="article:published_time" content="2026-09-28"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="A repeatable path from alert to cause"><meta name="twitter:description" content="A practical incident workflow connecting metrics, changes, logs, traces, mitigation, and recovery."><meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png"><meta name="twitter:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <title>A repeatable path from alert to cause — Hossein Moazami</title>
+<link rel="icon" href="../../assets/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32"><link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml"><link rel="stylesheet" href="../../assets/style.css?v=20260930-4">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"A repeatable path from alert to cause","datePublished":"2026-09-28","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/a-repeatable-path-from-alert-to-cause.html","image":"https://hossein.cloud/assets/og-card.png","description":"A repeatable incident workflow connecting service-level metrics, deployments, structured logs, and traces."}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap"><a class="brand" href="../../index.html" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a><nav class="nav" aria-label="Main navigation"><a href="../../index.html#work">Work</a><a href="../../index.html#experience">Experience</a><a href="../index.html" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="../../index.html#contact">Contact</a></nav></header>
+  <main id="main" class="article-shell">
+    <a class="back-link" href="../index.html"><span aria-hidden="true">←</span> All field notes</a>
+    <article>
+      <header class="article-header"><div class="post-meta"><span class="post-tag">Observability</span><time datetime="2026-09-28">September 28, 2026</time><span aria-hidden="true">/</span><span>5 min read</span></div><h1>A repeatable path from alert to cause</h1><p class="article-lead">Good observability is not the number of dashboards available. It is how quickly a signal can be turned into a safe decision.</p><p class="article-byline">By Hossein Moazami · Senior DevOps &amp; Platform Engineer</p></header>
+      <div class="article-body">
+        <p>I use this workflow in test environments to exercise an observability stack. The example is intentionally generated: a small API receives traffic while a downstream service adds latency. It is not presented as an employer incident. The goal is to make the investigation repeatable before a real alert arrives.</p>
+
+        <h2>Begin with the user-visible signal.</h2>
+        <p>Suppose an alert says the API’s 95th-percentile latency has stayed above 800 milliseconds for ten minutes. I record the exact start time, affected environment, route, and alert query. Then I check the basic service signals together: request rate, errors, duration, and saturation. Looking at latency alone can hide a traffic spike, retry storm, or capacity limit.</p>
+<pre tabindex="0" aria-label="PromQL latency query"><code>histogram_quantile(
+  0.95,
+  sum by (le, route) (
+    rate(http_request_duration_seconds_bucket{
+      job="catalog-api"
+    }[5m])
+  )
+)</code></pre>
+        <p>I compare the affected route with other routes and the current window with a healthy window. The first question is scope: one endpoint, one pod, one zone, one tenant, or the entire service? A narrow scope changes both the likely cause and the safest mitigation.</p>
+
+        <h2>Place changes on the same timeline.</h2>
+        <p>Before searching every log, I look for changes around the alert start: deployments, feature flags, dependency releases, node events, and configuration updates.</p>
+<pre tabindex="0" aria-label="Kubernetes rollout investigation commands"><code>kubectl rollout history deployment/catalog-api
+kubectl get pods -l app=catalog-api -o wide
+kubectl get events --sort-by=.lastTimestamp
+kubectl describe deployment catalog-api</code></pre>
+        <p>Correlation is not proof. A deployment near the incident is a useful hypothesis, not an automatic root cause. I compare old and new replicas when both exist, and check whether latency follows a version, node, or availability zone.</p>
+
+        <h2>Use logs to explain the shape, not rediscover it.</h2>
+        <p>Structured application logs should include a timestamp, request ID, trace ID, route, status, duration, upstream name, and upstream duration. They should not contain credentials or full request bodies by default.</p>
+<pre tabindex="0" aria-label="Structured application log example"><code>{
+  "level": "warn",
+  "route": "/v1/catalog",
+  "status": 200,
+  "duration_ms": 947,
+  "upstream": "inventory",
+  "upstream_ms": 881,
+  "trace_id": "64bd2e..."
+}</code></pre>
+        <p>In this lab, slow requests share high <code>upstream_ms</code> values while application CPU and queue depth remain normal. That narrows the search to the dependency path. A trace using the same <code>trace_id</code> then shows whether the time is DNS, connection setup, server processing, retries, or another child call.</p>
+        <p>Metrics show that many requests are slow. Logs provide request-level context. Traces explain where one request spent its time. Using each signal for its strength is faster than trying to make one tool answer every question.</p>
+
+        <h2>Mitigate before completing the investigation.</h2>
+        <p>If user impact is active and the evidence is strong enough, I choose the smallest reversible mitigation: roll back a release, disable a feature flag, reduce concurrency, route around a dependency, or add temporary capacity. I avoid changing several variables at once because that makes recovery harder to verify.</p>
+        <p>Timeouts and retries deserve special care. Adding retries to a saturated dependency can increase load and extend the incident. A timeout should fit within the caller’s end-to-end budget, and retries should be bounded, use jitter, and apply only to operations safe to repeat.</p>
+
+        <h2>Validate with the signal that detected the problem.</h2>
+        <p>After mitigation, I watch p95 and p99 latency, error rate, throughput, saturation, and backlog long enough to cover the original alert window. “Pods are green” is not recovery if users still see slow responses.</p>
+        <p>The final note is short: impact, timeline, trigger, contributing conditions, why detection worked or failed, mitigation, and a small number of owned follow-ups. The repeatable path is simple: confirm impact, define scope, align changes, move from metrics to logs to traces, mitigate safely, and verify recovery.</p>
+      </div>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>Senior DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="../../index.html#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="../../index.html#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <a class="article-next" href="a-small-rag-service-i-would-actually-deploy.html"><span><small>Next field note</small><strong>A small RAG service I would actually deploy</strong></span><span aria-hidden="true">→</span></a>
+    </article>
+  </main>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="../../index.html">Home</a><a href="https://github.com/hosseinmoazami" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:hossein.moazami.goodarzi@gmail.com">Email</a></div></footer>
+</body>
+</html>

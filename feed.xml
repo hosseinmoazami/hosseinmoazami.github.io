@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>Hossein Moazami — Field Notes</title>
+    <link>https://hossein.cloud/blog/</link>
+    <description>Practical notes on infrastructure, DevOps, LLM operations, and RAG systems.</description>
+    <language>en</language>
+    <lastBuildDate>Tue, 29 Sep 2026 08:00:00 GMT</lastBuildDate>
+    <atom:link href="https://hossein.cloud/feed.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Making a Kubernetes workload boring to operate</title>
+      <link>https://hossein.cloud/blog/posts/making-kubernetes-workloads-boring-to-operate.html</link>
+      <guid isPermaLink="true">https://hossein.cloud/blog/posts/making-kubernetes-workloads-boring-to-operate.html</guid>
+      <pubDate>Tue, 29 Sep 2026 07:00:00 GMT</pubDate>
+      <description>A practical reliability baseline for probes, graceful shutdowns, rollout safety, resource limits, and failure drills.</description>
+    </item>
+    <item>
+      <title>Treat Terraform state like production data</title>
+      <link>https://hossein.cloud/blog/posts/treat-terraform-state-like-production-data.html</link>
+      <guid isPermaLink="true">https://hossein.cloud/blog/posts/treat-terraform-state-like-production-data.html</guid>
+      <pubDate>Tue, 29 Sep 2026 06:00:00 GMT</pubDate>
+      <description>A safer workflow for remote state, locking, reviewed plans, refactors, and recovery without risky manual edits.</description>
+    </item>
+    <item>
+      <title>A repeatable path from alert to cause</title>
+      <link>https://hossein.cloud/blog/posts/a-repeatable-path-from-alert-to-cause.html</link>
+      <guid isPermaLink="true">https://hossein.cloud/blog/posts/a-repeatable-path-from-alert-to-cause.html</guid>
+      <pubDate>Mon, 28 Sep 2026 08:00:00 GMT</pubDate>
+      <description>A simple incident workflow that connects service-level metrics, deployments, structured logs, and traces.</description>
+    </item>
+    <item>
+      <title>A small RAG service I would actually deploy</title>
+      <link>https://hossein.cloud/blog/posts/a-small-rag-service-i-would-actually-deploy.html</link>
+      <guid isPermaLink="true">https://hossein.cloud/blog/posts/a-small-rag-service-i-would-actually-deploy.html</guid>
+      <pubDate>Mon, 28 Sep 2026 07:00:00 GMT</pubDate>
+      <description>A reference architecture for permission-aware retrieval, citations, evaluation, and safe operations.</description>
+    </item>
+    <item>
+      <title>One controlled gateway for LLM traffic</title>
+      <link>https://hossein.cloud/blog/posts/one-controlled-gateway-for-llm-traffic.html</link>
+      <guid isPermaLink="true">https://hossein.cloud/blog/posts/one-controlled-gateway-for-llm-traffic.html</guid>
+      <pubDate>Sun, 27 Sep 2026 08:00:00 GMT</pubDate>
+      <description>A gateway pattern for model routing, budgets, retries, telemetry, and guardrails shared across applications.</description>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,84 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A compact reference architecture for a production-minded RAG service with permission-aware retrieval, citations, evaluation, and safe operations."><meta name="author" content="Hossein Moazami"><meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/blog/posts/a-small-rag-service-i-would-actually-deploy.html">
+  <meta property="og:type" content="article"><meta property="og:title" content="A small RAG service I would actually deploy"><meta property="og:description" content="A compact reference architecture for ingestion, permission-aware retrieval, cited answers, evaluation, and safe operations."><meta property="og:url" content="https://hossein.cloud/blog/posts/a-small-rag-service-i-would-actually-deploy.html"><meta property="og:image" content="https://hossein.cloud/assets/og-card.png"><meta property="og:image:width" content="1200"><meta property="og:image:height" content="630"><meta property="og:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer"><meta property="article:published_time" content="2026-09-28"><meta name="twitter:card" content="summary_large_image"><meta name="twitter:title" content="A small RAG service I would actually deploy"><meta name="twitter:description" content="A compact reference architecture for ingestion, permission-aware retrieval, cited answers, evaluation, and safe operations."><meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png"><meta name="twitter:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <title>A small RAG service I would actually deploy — Hossein Moazami</title>
+<link rel="icon" href="../../assets/favicon.ico" sizes="any"><link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32"><link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml"><link rel="stylesheet" href="../../assets/style.css?v=20260930-4">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"A small RAG service I would actually deploy","datePublished":"2026-09-28","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/a-small-rag-service-i-would-actually-deploy.html","image":"https://hossein.cloud/assets/og-card.png","description":"A compact reference architecture for a production-minded RAG service with permission-aware retrieval, citations, evaluation, and safe operations."}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap"><a class="brand" href="../../index.html" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a><nav class="nav" aria-label="Main navigation"><a href="../../index.html#work">Work</a><a href="../../index.html#experience">Experience</a><a href="../index.html" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="../../index.html#contact">Contact</a></nav></header>
+  <main id="main" class="article-shell">
+    <a class="back-link" href="../index.html"><span aria-hidden="true">←</span> All field notes</a>
+    <article>
+      <header class="article-header"><div class="post-meta"><span class="post-tag">RAG</span><time datetime="2026-09-28">September 28, 2026</time><span aria-hidden="true">/</span><span>6 min read</span></div><h1>A small RAG service I would actually deploy</h1><p class="article-lead">A RAG demo can fit in a notebook. A useful service also needs document ownership, access control, citations, evaluation, and a way to fail honestly.</p><p class="article-byline">By Hossein Moazami · Senior DevOps &amp; Platform Engineer</p></header>
+      <div class="article-body">
+        <p>This is a reference design for answering questions over internal documentation. It is not a claim about an employer system. I keep the architecture deliberately small: an API, an ingestion worker, PostgreSQL with <code>pgvector</code>, object storage for source documents, and one model provider behind an internal client.</p>
+
+        <h2>Build ingestion as a real data pipeline.</h2>
+        <p>For every document I store a stable document ID, source URL, owner, version, checksum, updated time, tenant, and access-control metadata. The worker normalizes supported formats, removes repeated navigation, splits text into chunks of roughly 350–500 tokens with a small overlap, creates embeddings in batches, and writes the new version in a transaction.</p>
+        <p>A checksum prevents unchanged documents from being re-embedded. Versioned writes prevent a failed ingestion from deleting the last good copy. When a document is removed or access changes, the pipeline must update or delete its chunks; freshness is part of retrieval quality.</p>
+        <p>Chunk size is not a magic constant. I start with a reasonable value, then tune it against real questions. Very small chunks lose context. Very large chunks dilute relevance and consume the model’s context window.</p>
+
+        <h2>Filter permissions before ranking.</h2>
+        <p>The query path authenticates the caller first. Retrieval must filter by tenant and allowed document IDs before results can reach the model. Filtering after generation is too late.</p>
+<pre tabindex="0" aria-label="Permission-aware retrieval query"><code>SELECT
+  document_id,
+  chunk_id,
+  content,
+  source_url,
+  embedding &lt;=&gt; $3 AS distance
+FROM document_chunks
+WHERE tenant_id = $1
+  AND acl_principals &amp;&amp; $2
+ORDER BY embedding &lt;=&gt; $3
+LIMIT 20;</code></pre>
+        <p>For a small corpus, vector search may be enough. For operational documentation, hybrid retrieval often helps because exact error codes, resource names, and commands matter. I retrieve a wider candidate set with vector and keyword search, combine the results, and optionally rerank the top candidates before sending a few useful chunks to the model.</p>
+
+        <h2>Return evidence, including when it is missing.</h2>
+<pre tabindex="0" aria-label="FastAPI cited-answer endpoint example"><code>@app.post("/v1/answers")
+async def answer(request: Question, user=Depends(authenticate)):
+    candidates = await retrieve(
+        query=request.question,
+        tenant=user.tenant,
+        principals=user.principals,
+        limit=20,
+    )
+    context = rerank(request.question, candidates)[:5]
+
+    if not context or context[0].score &lt; MIN_RELEVANCE:
+        return {
+            "answer": "I could not find enough evidence.",
+            "sources": [],
+        }
+
+    result = await llm.generate(
+        prompt=build_prompt(request.question, context),
+        timeout_seconds=15,
+    )
+    return {
+        "answer": result.text,
+        "sources": unique_sources(context),
+    }</code></pre>
+        <p>The prompt tells the model to answer only from supplied context, cite source identifiers, and say when evidence is insufficient. That instruction improves behavior, but it is not a security boundary. Retrieved documents are untrusted data: text inside them must not override system policy or grant tool access.</p>
+        <p>I validate returned citations against retrieved chunk IDs instead of trusting invented URLs. For high-impact answers, the interface should make sources easy to open and keep a human in the decision path.</p>
+
+        <h2>Evaluate the system, not just the model.</h2>
+        <p>I keep a small versioned set of representative questions with expected source documents and cases that should be refused. On material changes I measure retrieval recall, citation precision, answer support, refusal quality, p95 latency, and estimated cost. A fluent answer with the wrong source is a failure.</p>
+        <p>Production telemetry includes request ID, retrieval duration, number of candidates, selected chunk IDs, model alias, input and output tokens, total latency, refusal reason, and error class. Raw questions and document text are not logged by default because they may contain private data.</p>
+
+        <h2>Keep operations uneventful.</h2>
+        <p>I run API replicas separately from ingestion workers so a large import cannot starve queries. Database migrations are explicit, ingestion jobs are idempotent, provider calls have bounded timeouts, and retries use backoff only for safe transient failures. The vector database is backed up, and restore testing includes both metadata and embeddings.</p>
+        <p>The result is still a small service, but it has the properties a demo usually skips: ownership, freshness, permission-aware retrieval, verifiable citations, honest refusal, evaluation, and observable cost. Those pieces do more for trust than adding another framework to the stack.</p>
+      </div>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>Senior DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="../../index.html#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="../../index.html#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <a class="article-next" href="one-controlled-gateway-for-llm-traffic.html"><span><small>Next field note</small><strong>One controlled gateway for LLM traffic</strong></span><span aria-hidden="true">→</span></a>
+    </article>
+  </main>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="../../index.html">Home</a><a href="https://github.com/hosseinmoazami" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:hossein.moazami.goodarzi@gmail.com">Email</a></div></footer>
+</body>
+</html>

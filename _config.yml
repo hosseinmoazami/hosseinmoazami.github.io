@@ -1,0 +1,12 @@
+title: Hossein Moazami
+url: https://hossein.cloud
+exclude:
+  - templates
+  - scripts
+  - tmp
+  - output/email
+  - input
+  - private
+  - IMPROVEMENTS.md
+  - README.md
+  - .gitignore

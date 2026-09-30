@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A practical Kubernetes reliability baseline for probes, graceful shutdowns, rollout safety, resources, and failure drills.">
+  <meta name="author" content="Hossein Moazami">
+  <meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/blog/posts/making-kubernetes-workloads-boring-to-operate.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Making a Kubernetes workload boring to operate">
+  <meta property="og:description" content="A practical reliability baseline for probes, graceful shutdowns, rollout safety, resources, and failure drills.">
+  <meta property="og:url" content="https://hossein.cloud/blog/posts/making-kubernetes-workloads-boring-to-operate.html">
+  <meta property="og:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <meta property="article:published_time" content="2026-09-29">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Making a Kubernetes workload boring to operate">
+  <meta name="twitter:description" content="A practical reliability baseline for probes, graceful shutdowns, rollout safety, resources, and failure drills.">
+  <meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta name="twitter:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <title>Making a Kubernetes workload boring to operate — Hossein Moazami</title>
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32">
+  <link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml">
+  <link rel="stylesheet" href="../../assets/style.css?v=20260930-4">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Making a Kubernetes workload boring to operate","datePublished":"2026-09-29","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/making-kubernetes-workloads-boring-to-operate.html","image":"https://hossein.cloud/assets/og-card.png","description":"A practical Kubernetes reliability baseline for probes, graceful shutdowns, rollout safety, resources, and failure drills."}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap"><a class="brand" href="../../index.html" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a><nav class="nav" aria-label="Main navigation"><a href="../../index.html#work">Work</a><a href="../../index.html#experience">Experience</a><a href="../index.html" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="../../index.html#contact">Contact</a></nav></header>
+  <main id="main" class="article-shell">
+    <a class="back-link" href="../index.html"><span aria-hidden="true">←</span> All field notes</a>
+    <article>
+      <header class="article-header"><div class="post-meta"><span class="post-tag">Kubernetes</span><time datetime="2026-09-29">September 29, 2026</time><span aria-hidden="true">/</span><span>5 min read</span></div><h1>Making a Kubernetes workload boring to operate</h1><p class="article-lead">Reliability rarely comes from one clever setting. It comes from a small set of safeguards that make routine failures predictable.</p><p class="article-byline">By Hossein Moazami · Senior DevOps &amp; Platform Engineer</p></header>
+      <div class="article-body">
+        <p>This is the baseline I use in lab and reference environments when I want a Kubernetes workload to behave predictably. It is not a story about a production incident, and the numbers are not universal defaults. The useful part is the sequence: define what healthy means, make shutdowns graceful, limit blast radius, and test the assumptions.</p>
+
+        <h2>Start with the failure contract.</h2>
+        <p>Before writing YAML, I want four questions answered. How does Kubernetes know the process has started? When is it ready for traffic? When should it be restarted? How long does it need to stop accepting work and finish in-flight requests?</p>
+        <p>A startup probe protects a slow boot from an impatient liveness probe. A readiness probe controls traffic. A liveness probe is only for a process that cannot recover without a restart. Using the same endpoint for all three hides important differences.</p>
+
+<pre tabindex="0" aria-label="Kubernetes deployment example"><code>apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: catalog-api
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: catalog-api
+  strategy:
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  template:
+    metadata:
+      labels:
+        app: catalog-api
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+        - name: api
+          image: ghcr.io/example/catalog-api:1.8.2
+          lifecycle:
+            preStop:
+              exec:
+                command: ["sh", "-c", "sleep 5"]
+          startupProbe:
+            httpGet: {path: /startup, port: 8080}
+            periodSeconds: 2
+            failureThreshold: 30
+          readinessProbe:
+            httpGet: {path: /ready, port: 8080}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /live, port: 8080}
+            periodSeconds: 10
+          resources:
+            requests: {cpu: 200m, memory: 256Mi}
+            limits: {memory: 512Mi}</code></pre>
+
+        <p>The short <code>preStop</code> delay gives endpoint changes time to propagate, but it is not the shutdown mechanism. The application must handle <code>SIGTERM</code>, stop accepting new work, and finish requests within the grace period.</p>
+
+        <h2>Protect capacity, not just pods.</h2>
+        <p>Three replicas only help when the scheduler can place them across meaningful failure domains. I add topology spread constraints across nodes, and across zones when the cluster really has multiple zones. For small clusters I usually prefer a soft constraint so one unavailable zone does not make every new pod unschedulable.</p>
+        <p>A PodDisruptionBudget protects against voluntary disruption such as a node drain. It does not create capacity, protect against a node crash, or fix an application that cannot become ready. For three replicas, <code>minAvailable: 2</code> is understandable, but it still needs enough spare cluster capacity during maintenance.</p>
+        <p>CPU limits need deliberate testing because throttling can increase tail latency. Memory limits are more direct: exceeding one produces an OOM kill. I begin with measured requests, load-test the service, and alert on throttling, OOM kills, restarts, and sustained saturation before changing values.</p>
+
+        <h2>Make rollout checks part of delivery.</h2>
+<pre tabindex="0" aria-label="Kubernetes rollout verification commands"><code>kubectl apply -f k8s/
+kubectl rollout status deployment/catalog-api --timeout=5m
+kubectl get pods -l app=catalog-api -o wide
+kubectl get events --sort-by=.lastTimestamp
+kubectl top pods -l app=catalog-api</code></pre>
+        <p>A successful <code>apply</code> only means the API accepted the objects. The delivery job should wait for the rollout and fail if the new replicas do not become ready. For a higher-risk change, I also watch error rate and latency during a canary or staged rollout.</p>
+
+        <h2>Verify the design with small failure drills.</h2>
+        <p>In a non-production environment, I delete one pod while sending traffic, restart a node, and deploy a version with a deliberately failing readiness check. The expected result is specific: traffic stays on ready pods, replacement capacity appears, the rollout stops safely, and the alert explains what failed.</p>
+        <p>The final baseline is intentionally unexciting: separate health signals, graceful termination, realistic resources, distributed replicas, protected disruptions, observable rollouts, and rehearsed recovery. “Boring” infrastructure is usually infrastructure whose failure modes have already been made visible.</p>
+      </div>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>Senior DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="../../index.html#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="../../index.html#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <a class="article-next" href="treat-terraform-state-like-production-data.html"><span><small>Next field note</small><strong>Treat Terraform state like production data</strong></span><span aria-hidden="true">→</span></a>
+    </article>
+  </main>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="../../index.html">Home</a><a href="https://github.com/hosseinmoazami" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:hossein.moazami.goodarzi@gmail.com">Email</a></div></footer>
+</body>
+</html>

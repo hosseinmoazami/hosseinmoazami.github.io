@@ -1,330 +1,247 @@
-<!DOCTYPE html>
-<!--[if lt IE 7]>      <html class="no-js lt-ie9 lt-ie8 lt-ie7"> <![endif]-->
-<!--[if IE 7]>         <html class="no-js lt-ie9 lt-ie8"> <![endif]-->
-<!--[if IE 8]>         <html class="no-js lt-ie9"> <![endif]-->
-<!--[if gt IE 8]><!-->
-<html class="no-js">
-<!--<![endif]-->
-
+<!doctype html>
+<html lang="en">
 <head>
-	<meta charset="utf-8">
-	<meta http-equiv="X-UA-Compatible" content="IE=edge">
-	<title>Hossein &mdash; Moazami</title>
-	<meta name="viewport" content="width=device-width, initial-scale=1">
-	<meta name="description" content="online resume for hossein moazami" />
-	<meta name="keywords"
-		content="moazami, hossein, android, php, wordpress, resume, bootstrap, website, html5, css3, responsive" />
-	<meta name="author" content="hossein_moazami" />
-
-	<link rel="shortcut icon" href="images/favicon.ico">
-
-	<!-- Animate.css -->
-	<link rel="stylesheet" href="css/animate.css">
-	<!-- Icomoon Icon Fonts-->
-	<link rel="stylesheet" href="css/icomoon.css">
-	<!-- Bootstrap  -->
-	<link rel="stylesheet" href="css/bootstrap.css">
-	<!-- Theme style  -->
-	<link rel="stylesheet" href="css/style.css">
-	<link rel="stylesheet" href="css/custom.css">
-	<!-- Bootstrap RTL  -->
-	<link rel="stylesheet" href="css/bootstrap-rtl.css">
-
-	<!-- Modernizr JS -->
-	<script src="js/modernizr-2.6.2.min.js"></script>
-	<!-- FOR IE9 below -->
-	<!--[if lt IE 9]>
-	<script src="js/respond.min.js"></script>
-	<![endif]-->
-
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Hossein Moazami is a senior DevOps and platform engineer with 7+ years across Kubernetes, infrastructure automation, CI/CD, observability, and software engineering.">
+  <meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Hossein Moazami — Senior DevOps & Platform Engineer">
+  <meta property="og:description" content="Reliable platforms, safer delivery, and practical infrastructure engineering.">
+  <meta property="og:url" content="https://hossein.cloud/">
+  <meta property="og:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Hossein Moazami — Senior DevOps & Platform Engineer">
+  <meta name="twitter:description" content="Reliable platforms, safer delivery, and practical infrastructure engineering.">
+  <meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta name="twitter:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <title>Hossein Moazami — Senior DevOps & Platform Engineer</title>
+  <link rel="icon" href="assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="assets/favicon-32x32.png" sizes="32x32">
+  <link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="feed.xml">
+  <link rel="stylesheet" href="assets/style.css?v=20260930-4">
+  <link rel="preload" as="image" href="assets/portrait.webp" type="image/webp">
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "Person",
+    "name": "Hossein Moazami",
+    "url": "https://hossein.cloud/",
+    "image": "https://hossein.cloud/assets/portrait.webp",
+    "jobTitle": "Senior DevOps and Platform Engineer",
+    "telephone": "+989371942700",
+    "homeLocation": {"@type": "Place", "name": "Tehran, Iran"},
+    "sameAs": [
+      "https://www.linkedin.com/in/hossein-moazami",
+      "https://github.com/hosseinmoazami"
+    ],
+    "knowsAbout": ["Kubernetes", "Terraform", "Ansible", "CI/CD", "Observability", "Cloud infrastructure", "LLM operations", "RAG systems"]
+  }
+  </script>
 </head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
 
-<body style="background-image: url(images/bg_img1.jpg);">
+  <header class="site-header wrap">
+    <a class="brand" href="index.html" aria-label="hossein.cloud — Home">
+      <span class="brand-mark" aria-hidden="true">h.</span>
+      <span class="brand-name">hossein.cloud</span>
+    </a>
+    <nav class="nav" aria-label="Main navigation">
+      <a href="#work">Work</a>
+      <a href="#experience">Experience</a>
+      <a href="blog/index.html">Writing</a>
+      <a href="resume.html">Résumé</a>
+      <a class="nav-contact" href="#contact">Contact</a>
+    </nav>
+  </header>
 
-	<div id="fh5co-main">
-		<div class="fh5co-tab-wrap">
-			<ul class="fh5co-tab-menu">
-				<li class="active"><a href="#" data-tab="1"><span class="icon icon-user"></span><span
-							class="menu-text">About Me</span></a></li>
-				<li><a href="#" data-tab="2"><span class="icon icon-graduation-cap"></span><span
-							class="menu-text">Education</span></a></li>
-				<li><a href="#" data-tab="3"><span class="icon icon-black-tie"></span><span
-							class="menu-text">Experience</span></a></li>
-				<li><a href="#" data-tab="4" data-pie="yes"><span
-							class="icon icon-fighter-jet"></span><span
-							class="menu-text">Skills</span></a></li>
-			</ul>
-			<div class="fh5co-tab-content active" data-content="1">
-				<div class="fh5co-content-inner text-center">
-					<div class="row row-bottom-padded-sm">
-						<div class="col-md-12">
-							<figure>
-								<img src="images/profile1.png" class="profile"
-									alt="hossein moazami profile image">
-							</figure>
-							<h1>Hossein Moazami</h1>
-							<p>Site Reliability Engineer</p>
-						</div>
-					</div>
-					<ul class="fh5co-social">
-						<li><a href="mailto:hossein.moazami0662@gmail.com"
-								alt="Email Address"><i class="icon-envelope"></i></a>
-						</li>
-						<li><a href="phone:+989371942700"><i class="icon-phone"></i></a></li>
-						<li><a href="https://www.linkedin.com/in/hossein-moazami/"><i
-									class="icon-linkedin"></i></a></li>
-						<li><a href="https://github.com/hosseinmoazami"><i
-									class="icon-github"></i></a></li>
-					</ul>
-				</div>
-			</div>
-			<div class="fh5co-tab-content" data-content="2">
-				<div class="fh5co-content-inner">
-					<div class="row">
-						<div class="col-md-12">
-							<div class="fh5co-feature text-align-right">
-								<div class="fh5co-text">
-									<p style="margin-bottom: 0.5em;">Bachelor's
-										degree, Computer Software Engineering
-									</p>
-									<p style="margin-bottom: 0.5em;">Boroujerdi
-										University</p>
-									<h2 style="margin-bottom: 1.5em;">2014-2017</h2>
-								</div>
-								<div class="fh5co-icon">
-									<i class="icon-graduation-cap"></i>
-								</div>
-							</div>
+  <main id="main">
+    <section class="hero wrap" aria-labelledby="intro-title">
+      <div class="hero-copy">
+        <p class="eyebrow">Senior DevOps &amp; Platform Engineer · Tehran, Iran</p>
+        <h1 id="intro-title"><span class="hero-line hero-line-ink">Reliable platforms.</span><span class="hero-line">Confident delivery.</span></h1>
+        <p class="hero-description">I’m Hossein Moazami. I design and operate Kubernetes platforms, delivery systems, and observability foundations that reduce release risk and make production easier to understand.</p>
+        <p class="availability"><span aria-hidden="true"></span>Open to senior DevOps, platform engineering, and infrastructure consulting conversations.</p>
+        <div class="hero-actions">
+          <a class="button" href="resume.html">View résumé <span aria-hidden="true">→</span></a>
+          <a class="button button-secondary" href="mailto:hossein.moazami.goodarzi@gmail.com?subject=Senior%20platform%20role">Start a conversation <span aria-hidden="true">→</span></a>
+        </div>
+        <nav class="profile-links" aria-label="Professional profiles">
+          <a href="https://github.com/hosseinmoazami" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+          <a href="https://www.linkedin.com/in/hossein-moazami" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+        </nav>
+      </div>
 
-							<div class="fh5co-feature text-align-right">
-								<div class="fh5co-text">
-									<p style="margin-bottom: 0.5em;">High
-										School
-										Diploma, Mathematics</p>
-									<p style="margin-bottom: 0.5em;">
-										Allameh Helli
-										High School</p>
-									<h2>2010-2014</h2>
-								</div>
-								<div class="fh5co-icon">
-									<i class="icon-graduation-cap"></i>
-								</div>
-							</div>
-						</div>
+      <figure class="profile">
+        <div class="profile-image-wrap"><img src="assets/portrait.webp" width="1254" height="1254" alt="Hossein Moazami" fetchpriority="high"></div>
+        <figcaption>
+          <span><strong>DevOps since 2019.</strong> Software roots.</span>
+          <span>Tehran, Iran · 7+ years in engineering</span>
+        </figcaption>
+      </figure>
 
-					</div>
-				</div>
-			</div>
-			<div class="fh5co-tab-content" data-content="3">
-				<div class="fh5co-content-inner">
-					<div class="row">
-						<div class="col-md-12">
-							<div class="fh5co-feature text-align-right">
-								<div class="fh5co-text">
-									<p style="margin-bottom: 0.5em;">Devops Engineer
-									</p>
-									<p style="margin-bottom: 0.5em;">HPH Co</p>
-									<h5 style="margin-bottom: 1.5em;">Apr 2021 -
-										PRESENT</h5>
-								</div>
-								<div class="fh5co-icon">
-									<i class="icon-black-tie"></i>
-								</div>
-							</div>
-							<div class="separator"></div>
-							<div class="fh5co-feature text-align-right">
-								<div class="fh5co-text">
-									<p style="margin-bottom: 0.5em;">Devops Engineer
-									</p>
-									<p style="margin-bottom: 0.5em;">Shavaz</p>
-									<h5 style="margin-bottom: 1.5em;">Apr 2022 - Mar
-										2024</h5>
-								</div>
-								<div class="fh5co-icon">
-									<i class="icon-black-tie"></i>
-								</div>
-							</div>
-							<div class="separator"></div>
-							<div class="fh5co-feature text-align-right">
-								<div class="fh5co-text">
-									<p style="margin-bottom: 0.5em;">Software
-										Engineer Manager</p>
-									<p style="margin-bottom: 0.5em;">HPH Co</p>
-									<h5 style="margin-bottom: 1.5em;">Oct 2020 - Apr
-										2022</h5>
-								</div>
-								<div class="fh5co-icon">
-									<i class="icon-black-tie"></i>
-								</div>
-							</div>
-							<div class="separator"></div>
-							<div class="fh5co-feature text-align-right">
-								<div class="fh5co-text">
-									<p style="margin-bottom: 0.5em;">Javascript
-										Engineer</p>
-									<p style="margin-bottom: 0.5em;">Arvan Cloud</p>
-									<h5 style="margin-bottom: 1.5em;">Feb 2021 - Apr
-										2021</h5>
-								</div>
-								<div class="fh5co-icon">
-									<i class="icon-black-tie"></i>
-								</div>
-							</div>
-							<div class="separator"></div>
-							<div class="fh5co-feature text-align-right">
-								<div class="fh5co-text">
-									<p style="margin-bottom: 0.5em;">Software
-										Engineer</p>
-									<p style="margin-bottom: 0.5em;">IAEO</p>
-									<h5 style="margin-bottom: 1.5em;">Jul 2020 - Oct
-										2020</h5>
-								</div>
-								<div class="fh5co-icon">
-									<i class="icon-black-tie"></i>
-								</div>
-							</div>
-							<div class="separator"></div>
-							<div class="fh5co-feature text-align-right">
-								<div class="fh5co-text">
-									<p style="margin-bottom: 0.5em;">Software
-										Engineer</p>
-									<p style="margin-bottom: 0.5em;">Modern
-										Strategies Co</p>
-									<h5 style="margin-bottom: 1.5em;">Jul 2019 - Feb
-										2020</h5>
-								</div>
-								<div class="fh5co-icon">
-									<i class="icon-black-tie"></i>
-								</div>
-							</div>
-							<div class="separator"></div>
-							<div class="fh5co-feature text-align-right">
-								<div class="fh5co-text">
-									<p style="margin-bottom: 0.5em;">Software
-										Engineer</p>
-									<p style="margin-bottom: 0.5em;">Rahnet
-										Institute</p>
-									<h5 style="margin-bottom: 1.5em;">Apr 2017 - Nov
-										2017</h5>
-								</div>
-								<div class="fh5co-icon">
-									<i class="icon-black-tie"></i>
-								</div>
-							</div>
+      <a class="hero-scroll" href="#outcomes">Selected impact <span aria-hidden="true">↓</span></a>
+    </section>
 
-						</div>
+    <section id="outcomes" class="impact-band" aria-label="Outcome snapshot">
+      <div class="wrap impact-grid">
+        <p><strong>7+ yrs</strong><span>across DevOps and software engineering</span></p>
+        <p><strong>30%</strong><span>less deployment downtime reported</span></p>
+        <p><strong>40%</strong><span>fewer manual configuration errors reported</span></p>
+        <p><strong>Weeks → hours</strong><span>deployment cycles reported at Shavaz</span></p>
+      </div>
+    </section>
 
-					</div>
-				</div>
-			</div>
-			<div class="fh5co-tab-content" data-content="4">
-				<div class="fh5co-content-inner">
-					<div class="row">
-						<div class="col-md-12">
-						</div>
+    <section id="work" class="section wrap" aria-labelledby="work-title">
+      <div class="section-heading">
+        <p class="eyebrow">01 / Selected systems work</p>
+        <div>
+          <h2 id="work-title">Platform work judged by safer delivery and clearer operations.</h2>
+          <p class="section-intro">Selected examples showing the problem, the systems I owned, and the reported operational outcome—not just the tools involved.</p>
+        </div>
+      </div>
 
+      <div class="case-grid">
+        <article class="case-card case-card-featured">
+          <div class="case-topline"><span>NafisLife · Platform modernization</span><span>Employer outcome</span></div>
+          <div class="case-featured-body">
+            <div class="case-lead">
+              <h3>Modernizing legacy infrastructure into a safer, repeatable delivery platform.</h3>
+              <p>As a DevOps Engineer, I orchestrated the migration of legacy infrastructure to Kubernetes and connected configuration automation, delivery, private-cloud infrastructure, and production visibility across staging and production environments.</p>
+            </div>
+            <div class="case-scope">
+              <p class="case-label">Scope &amp; ownership</p>
+              <ul>
+                <li>Orchestrated the Kubernetes migration and automated configuration with Ansible.</li>
+                <li>Built and maintained CI/CD, private-cloud infrastructure, and staging and production environments.</li>
+                <li>Improved visibility with Prometheus, Grafana, and centralized ELK logging.</li>
+                <li>Used load testing and performance tuning to improve behavior under peak traffic.</li>
+              </ul>
+            </div>
+          </div>
+          <dl class="case-results case-results-four">
+            <div><dt>30%</dt><dd>less deployment downtime</dd></div>
+            <div><dt>40%</dt><dd>fewer manual configuration errors</dd></div>
+            <div><dt>30%</dt><dd>shorter software release time</dd></div>
+            <div><dt>25%</dt><dd>better peak response time</dd></div>
+          </dl>
+          <ul class="tag-list" role="list" aria-label="Technologies"><li>Kubernetes</li><li>Ansible</li><li>CI/CD</li><li>Private cloud</li><li>Prometheus</li><li>Grafana</li><li>ELK</li></ul>
+        </article>
 
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="75">
-								<span><strong>Kubernetes</strong>75%</span>
-							</div>
-						</div>
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="90">
-								<span><strong>Docker</strong>90%</span>
-							</div>
-						</div>
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="90">
-								<span><strong>Git</strong>90%</span>
-							</div>
-						</div>
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="75">
-								<span><strong> CI/CD</strong>75%</span>
-							</div>
-						</div>
+        <div class="case-supporting">
+          <article class="case-card">
+            <div class="case-topline"><span>Shavaz · Delivery &amp; reliability</span><span>Employer outcome</span></div>
+            <h3>Moving deployments from weeks to hours for a high-traffic commerce platform.</h3>
+            <p>On a platform reported at more than 600,000 monthly active users, I integrated GitLab CI/CD with Kubernetes, deployed Prometheus and Grafana, worked with developers on high-traffic performance issues, and configured a four-node MinIO cluster.</p>
+            <dl class="case-results case-results-four">
+              <div><dt>Weeks → hours</dt><dd>deployment cycle</dd></div>
+              <div><dt>30%</dt><dd>higher team productivity</dd></div>
+              <div><dt>40%</dt><dd>better system reliability</dd></div>
+              <div><dt>25%</dt><dd>lower storage rental costs</dd></div>
+            </dl>
+            <ul class="tag-list tag-list-light" role="list" aria-label="Technologies"><li>Kubernetes</li><li>GitLab CI/CD</li><li>Prometheus</li><li>Grafana</li><li>MinIO</li></ul>
+          </article>
 
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="70">
-								<span><strong>Terraform</strong>70%</span>
-							</div>
-						</div>
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="70">
-								<span><strong>Ansible</strong>70%</span>
-							</div>
-						</div>
+          <article class="case-card case-card-reference">
+            <div class="case-topline"><span>Public engineering proof</span><span>GitHub</span></div>
+            <h3>A reproducible path from empty VMs to an observable K3s application platform.</h3>
+            <p>The public implementation provisions one control plane, two workers, and a builder, then connects delivery, monitoring, a highly available data layer, and a three-replica application.</p>
+            <dl class="system-path">
+              <div><dt>Provision</dt><dd>Terraform + libvirt</dd></div>
+              <div><dt>Configure</dt><dd>Ansible + K3s</dd></div>
+              <div><dt>Deliver</dt><dd>Private registry + GitLab Runner</dd></div>
+              <div><dt>Operate</dt><dd>kube-prometheus-stack + PostgreSQL HA</dd></div>
+              <div><dt>Run</dt><dd>Three-replica FastAPI deployment</dd></div>
+            </dl>
+            <a class="text-link" href="https://github.com/hosseinmoazami/infra-implementation-hobby" target="_blank" rel="noopener noreferrer">Review the public implementation <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+          </article>
+        </div>
 
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="65">
-								<span><strong>Prometheus</strong>65%</span>
-							</div>
-						</div>
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="90">
-								<span><strong>Grafana</strong>90%</span>
-							</div>
-						</div>
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="40">
-								<span><strong>ELK stack</strong>40%</span>
-							</div>
-						</div>
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="80">
-								<span><strong>Bash</strong>80%</span>
-							</div>
-						</div>
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="70">
-								<span><strong>Go</strong>70%</span>
-							</div>
-						</div>
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="50">
-								<span><strong>Python</strong>50%</span>
-							</div>
-						</div>
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="70">
-								<span><strong>HA</strong>70%</span>
-							</div>
-						</div>
-						<div class="col-md-4 col-sm-6 col-xs-12 text-center float-left">
-							<div class="chart" data-percent="30">
-								<span><strong>AWS</strong>30%</span>
-							</div>
-						</div>
+        <aside class="leadership-strip" aria-label="Technical leadership">
+          <p class="eyebrow">Technical leadership</p>
+          <p><strong>Software roots, platform judgment.</strong> At NafisLife, I also led developers, reviewed code, mentored junior engineers, and guided legacy JavaScript modernization from planning through post-migration.</p>
+        </aside>
+      </div>
+      <p class="metric-note">Employer figures are reported outcomes from the supplied LinkedIn profile export. Public-project scope reflects the linked GitHub repository when this page was prepared.</p>
+    </section>
 
-					</div>
-				</div>
-			</div>
-		</div>
-		<footer id="fh5co-footer">
-			<div class="row">
-				<div class="col-md-6 col-md-offset-3 text-center direction-ltr ">
-					<small>
-						&copy; 2024 All Rights Reserved. <span class="fh5co-author">
-					</small>
-				</div>
-			</div>
-		</footer>
-	</div>
+    <section id="experience" class="section wrap" aria-labelledby="experience-title">
+      <div class="section-heading">
+        <p class="eyebrow">02 / Experience</p>
+        <div>
+          <h2 id="experience-title">Experience across platform operations and software delivery.</h2>
+          <p class="section-intro">Current and selected roles, with the complete timeline and supporting detail available in the résumé.</p>
+        </div>
+      </div>
 
-	<!-- jQuery -->
-	<script src="js/jquery.min.js"></script>
-	<!-- jQuery Easing -->
-	<script src="js/jquery.easing.1.3.js"></script>
-	<!-- Bootstrap -->
-	<script src="js/bootstrap.min.js"></script>
-	<!-- Waypoints -->
-	<script src="js/jquery.waypoints.min.js"></script>
-	<!-- Easy PieChart -->
-	<script src="js/jquery.easypiechart.min.js"></script>
-	<!-- MAIN JS -->
-	<script src="js/main.js"></script>
+      <div class="experience-list">
+        <article class="experience-row">
+          <header><div><h3>DevOps Engineer</h3><p class="company">NafisLife · Tehran Province, Iran</p></div><p class="date-range"><time datetime="2021-04">Apr 2021</time> — Present</p></header>
+          <p class="experience-summary">Orchestrated a Kubernetes migration and built the automation, delivery, private-cloud, monitoring, logging, and performance foundations around it.</p>
+        </article>
+        <article class="experience-row">
+          <header><div><h3>Software Engineering</h3><p class="company">NafisLife · Tehran, Iran</p></div><p class="date-range"><time datetime="2020-10">Oct 2020</time> — <time datetime="2022-04">Apr 2022</time></p></header>
+          <p class="experience-summary">Architected reusable React component libraries and guided legacy JavaScript modernization through planning, implementation, code review, and mentoring.</p>
+        </article>
+        <article class="experience-row">
+          <header><div><h3>DevOps Engineer</h3><p class="company">Shavaz · Tehran, Iran</p></div><p class="date-range"><time datetime="2019-04">Apr 2019</time> — <time datetime="2021-04">Apr 2021</time></p></header>
+          <p class="experience-summary">Integrated GitLab CI/CD with Kubernetes, deployed Prometheus and Grafana, collaborated on high-traffic performance issues, and built a four-node MinIO storage cluster.</p>
+        </article>
 
+        <div class="additional-roles">
+          <p class="eyebrow">Additional engineering roles</p>
+          <ul role="list">
+            <li><div><strong>JavaScript Developer · ArvanCloud</strong><span>Built REST API integrations and technical documentation for CDN App.</span></div><time datetime="2021-02">Feb 2021</time> — <time datetime="2021-04">Apr 2021</time></li>
+            <li><div><strong>Back-end Developer · IAEO</strong><span>Led a PHP 5-to-Laravel migration and developed payment and financial features.</span></div><time datetime="2020-07">Jul 2020</time> — <time datetime="2020-10">Oct 2020</time></li>
+          </ul>
+        </div>
+
+        <div class="experience-footer">
+          <p>Dates are shown as supplied in the LinkedIn profile; several roles overlap and no employment type has been inferred.</p>
+          <a class="text-link" href="resume.html">View complete résumé <span aria-hidden="true">→</span></a>
+        </div>
+      </div>
+    </section>
+
+    <section class="section wrap" aria-labelledby="capabilities-title">
+      <div class="section-heading">
+        <p class="eyebrow">03 / Capabilities</p>
+        <div><h2 id="capabilities-title">Built around outcomes, not tool lists.</h2></div>
+      </div>
+      <div class="capability-grid">
+        <article><span>01</span><h3>Platform foundations</h3><p>Repeatable cloud and Kubernetes environments with clear ownership, safe defaults, and recovery paths.</p><ul role="list"><li>Kubernetes</li><li>Terraform</li><li>Ansible</li><li>AWS</li><li>Helm</li><li>Linux</li></ul></article>
+        <article><span>02</span><h3>Delivery systems</h3><p>Pipelines and GitOps workflows that make a reviewed change the same change that reaches production.</p><ul role="list"><li>GitLab CI/CD</li><li>Jenkins</li><li>GitOps</li><li>Go</li><li>Python</li><li>Bash</li></ul></article>
+        <article><span>03</span><h3>Operational intelligence</h3><p>Useful service signals, actionable alerts, and incident workflows that connect symptoms to decisions.</p><ul role="list"><li>Prometheus</li><li>Grafana</li><li>ELK</li><li>OpenTelemetry</li><li>HAProxy</li><li>Nginx</li></ul></article>
+      </div>
+    </section>
+
+    <section class="writing-section wrap" aria-labelledby="writing-title">
+      <div class="writing-heading"><div><p class="eyebrow">04 / Field notes</p><h2 id="writing-title">Practical notes for operating modern systems.</h2></div><a class="text-link" href="blog/index.html">View all writing <span aria-hidden="true">→</span></a></div>
+      <ol class="writing-list" role="list">
+        <li><a href="blog/posts/making-kubernetes-workloads-boring-to-operate.html"><span><small>Kubernetes · 5 min</small><strong>Making a Kubernetes workload boring to operate</strong></span><span aria-hidden="true">→</span></a></li>
+        <li><a href="blog/posts/a-small-rag-service-i-would-actually-deploy.html"><span><small>RAG · 6 min</small><strong>A small RAG service I would actually deploy</strong></span><span aria-hidden="true">→</span></a></li>
+        <li><a href="blog/posts/one-controlled-gateway-for-llm-traffic.html"><span><small>LLM Ops · 6 min</small><strong>One controlled gateway for LLM traffic</strong></span><span aria-hidden="true">→</span></a></li>
+      </ol>
+    </section>
+
+    <section id="contact" class="contact-section wrap" aria-labelledby="contact-title">
+      <div><p class="eyebrow">Let’s build something dependable</p><h2 id="contact-title">Need a stronger path to production?</h2><p>I can help turn an infrastructure problem into a practical review, a prioritized delivery plan, and systems your team can operate with confidence.</p><ul class="engagement-list" role="list"><li>Platform &amp; reliability review</li><li>CI/CD &amp; Kubernetes assessment</li><li>Observability baseline</li></ul><div class="contact-details" aria-label="Contact details"><a class="contact-detail" href="mailto:hossein.moazami.goodarzi@gmail.com">hossein.moazami.goodarzi<wbr>@gmail.com</a><a class="contact-detail" href="tel:+989371942700">+98 937 194 2700</a></div></div>
+      <div class="contact-actions"><a class="button button-light" href="mailto:hossein.moazami.goodarzi@gmail.com">Start a conversation <span aria-hidden="true">→</span></a><a class="text-link text-link-light" href="resume.html">View résumé <span aria-hidden="true">→</span></a></div>
+    </section>
+  </main>
+
+  <footer class="site-footer wrap">
+    <p>© 2026 Hossein Moazami</p>
+    <div class="footer-links">
+      <a href="blog/index.html">Writing</a>
+      <a href="https://github.com/hosseinmoazami" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+      <a href="https://www.linkedin.com/in/hossein-moazami" target="_blank" rel="noopener noreferrer">LinkedIn <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a>
+    </div>
+  </footer>
 </body>
-
 </html>

@@ -1,0 +1,11 @@
+<!-- Insert this list item in blog/index.html inside .post-list, newest first. -->
+<li>
+  <article class="post-item">
+    <a href="posts/{{SLUG}}.html">
+      <div class="post-meta"><time datetime="{{DATE_ISO}}">{{DATE_DISPLAY}}</time><span aria-hidden="true">/</span><span>{{READING_TIME}}</span><span class="post-tag">{{TOPIC}}</span></div>
+      <h2>{{TITLE}}</h2>
+      <p>{{SUMMARY}}</p>
+      <span class="read-label">Read article <span aria-hidden="true">→</span></span>
+    </a>
+  </article>
+</li>
