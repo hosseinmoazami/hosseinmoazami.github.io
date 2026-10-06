@@ -462,6 +462,13 @@ a:focus-visible {
 .article-body pre { max-width: 100%; margin-block: 27px; padding: 22px; overflow: auto; color: var(--dark-text); background: var(--dark); border: 1px solid var(--dark-line); border-radius: 7px; direction: ltr; text-align: left; line-height: 1.65; }
 .article-body pre:focus-visible { outline: 3px solid var(--brass-bright); outline-offset: 4px; }
 .article-body pre code { padding: 0; color: inherit; background: none; overflow-wrap: normal; }
+.article-body .reference-table { max-width: 100%; overflow-x: auto; margin-block: 24px; border: 1px solid var(--line); border-radius: 7px; }
+.article-body .reference-table:focus-visible { outline: 3px solid var(--brass-bright); outline-offset: 4px; }
+.article-body .reference-table table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.65; }
+.article-body .reference-table th, .article-body .reference-table td { padding: 12px 15px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
+.article-body .reference-table th { background: var(--tint); color: var(--ink); }
+.article-body .reference-table tr:last-child td { border-bottom: 0; }
+.article-body .reference-table code { white-space: nowrap; }
 .article-body blockquote { margin: 28px 0; padding-block: 15px; padding-inline-start: 23px; color: var(--ink); border-inline-start: 3px solid var(--brass); }
 .article-byline { margin-top: 18px; color: var(--accent-strong); font: 600 12px/1.7 var(--mono); }
 .article-author { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 24px; margin-top: 49px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }

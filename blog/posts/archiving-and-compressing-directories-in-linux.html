@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A Linux command reference for creating, extracting, listing, and checking tar, gzip, and zip archives.">
+  <meta name="author" content="Hossein Moazami">
+  <meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/blog/posts/archiving-and-compressing-directories-in-linux.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Archiving and Compressing Directories in Linux with tar, gzip, and zip — Hossein Moazami">
+  <meta property="og:description" content="A Linux command reference for creating, extracting, listing, and checking tar, gzip, and zip archives.">
+  <meta property="og:url" content="https://hossein.cloud/blog/posts/archiving-and-compressing-directories-in-linux.html">
+  <meta property="og:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <meta property="article:published_time" content="2026-10-06">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Archiving and Compressing Directories in Linux with tar, gzip, and zip — Hossein Moazami">
+  <meta name="twitter:description" content="A Linux command reference for creating, extracting, listing, and checking tar, gzip, and zip archives.">
+  <meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta name="twitter:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <title>Archiving and Compressing Directories in Linux with tar, gzip, and zip — Hossein Moazami</title>
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32">
+  <link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml">
+  <link rel="stylesheet" href="../../assets/style.css?v=20260930-4">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Archiving and Compressing Directories in Linux with tar, gzip, and zip","datePublished":"2026-10-06","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/archiving-and-compressing-directories-in-linux.html","image":"https://hossein.cloud/assets/og-card.png","description":"A Linux command reference for creating, extracting, listing, and checking tar, gzip, and zip archives."}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="../../index.html" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a>
+    <nav class="nav" aria-label="Main navigation"><a href="../../index.html#work">Work</a><a href="../../index.html#experience">Experience</a><a href="../index.html" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="../../index.html#contact">Contact</a></nav>
+  </header>
+  <main id="main" class="article-shell">
+    <a class="back-link" href="../index.html"><span aria-hidden="true">←</span> All field notes</a>
+    <article>
+      <header class="article-header"><div class="post-meta"><span class="post-tag">Linux</span><time datetime="2026-10-06">October 6, 2026</time><span aria-hidden="true">/</span><span>5 min read</span></div><h1>Archiving and Compressing Directories in Linux with tar, gzip, and zip</h1><p class="article-lead">A Linux command reference for creating, extracting, listing, and checking tar, gzip, and zip archives.</p><p class="article-byline">By Hossein Moazami · Senior DevOps &amp; Platform Engineer</p></header>
+      <div class="article-body">
+        <h2 id="quick-reference">Quick Reference</h2>
+
+        <pre tabindex="0" aria-label="Create, extract, and list a gzip-compressed tar archive"><code class="language-bash"># Archive and gzip-compress a directory
+tar -czvf archive_name.tar.gz /path/to/directory
+
+# Extract into the current directory
+tar -xzvf archive.tar.gz
+
+# List contents without extracting
+tar -tzvf archive.tar.gz</code></pre>
+
+        <p>Use <code>.tar.gz</code> for the conventional tar + gzip format on Linux. All paths below are generic examples. Run creation commands from outside the directory being archived, and choose a fresh output filename: creating a tar archive can overwrite an existing archive.</p>
+
+        <p>Jump to: <a href="#create">Create</a> · <a href="#flags">Flags</a> · <a href="#extract">Extract</a> · <a href="#list">List</a> · <a href="#destination">Destination</a> · <a href="#formats">Formats</a> · <a href="#tar-zip">tar.zip</a> · <a href="#examples">Examples</a> · <a href="#cheat-sheet">Cheat sheet</a>.</p>
+
+        <h2 id="create">Create a .tar.gz</h2>
+
+        <pre tabindex="0" aria-label="Compress myfolder with tar and gzip"><code class="language-bash">tar -czvf myfolder.tar.gz myfolder/</code></pre>
+
+        <p>Creates <code>myfolder.tar.gz</code> containing <code>myfolder/</code> and its contents, including subdirectories and hidden files. The original directory remains in place. Extraction recreates the <code>myfolder/</code> directory beneath the extraction destination.</p>
+
+        <p>With an absolute source path, GNU tar normally strips the leading <code>/</code> and may print “Removing leading / from member names.” For <code>/path/to/directory</code>, stored names begin with <code>path/to/directory/</code>. To keep only the directory name, use <code>-C</code>:</p>
+
+        <pre tabindex="0" aria-label="Store a directory without its parent path"><code class="language-bash">tar -czvf archive_name.tar.gz -C /path/to directory/</code></pre>
+
+        <p>Here <code>-C</code> changes the source lookup directory before processing <code>directory/</code>. The output archive is created in the shell’s current directory. See the <a href="https://www.gnu.org/software/tar/manual/tar.html">GNU tar manual</a> for path handling and option details.</p>
+
+        <h2 id="flags">Understanding the tar Flags</h2>
+
+        <div class="reference-table" role="region" aria-label="tar command flags" tabindex="0"><table><thead><tr><th scope="col">Flag</th><th scope="col">Meaning</th></tr></thead><tbody><tr><td><code>c</code></td><td>Create a new archive.</td></tr><tr><td><code>z</code></td><td>Use gzip compression or decompression.</td></tr><tr><td><code>v</code></td><td>Verbose: show files being processed.</td></tr><tr><td><code>f</code></td><td>Use the following argument as the archive filename.</td></tr><tr><td><code>x</code></td><td>Extract files.</td></tr><tr><td><code>t</code></td><td>List archive contents.</td></tr><tr><td><code>-C</code></td><td>Change directory before processing subsequent files or extracting.</td></tr></tbody></table></div>
+
+        <p>Choose one operation: <code>c</code>, <code>x</code>, or <code>t</code>. In these combined forms, <code>f</code> is last and the archive filename follows immediately. Case matters: <code>c</code> creates an archive; <code>-C</code> selects a directory.</p>
+
+        <p><code>v</code> is optional. Omit it for large directory trees or scripts to avoid excessive terminal output; errors are still reported.</p>
+
+        <pre tabindex="0" aria-label="Create without listing every file"><code class="language-bash">tar -czf archive.tar.gz directory/</code></pre>
+
+        <h2 id="extract">Extract a .tar.gz</h2>
+
+        <pre tabindex="0" aria-label="Extract a gzip-compressed tar archive"><code class="language-bash">tar -xzvf archive.tar.gz</code></pre>
+
+        <p>Extracts stored paths beneath the current directory. The archive remains unchanged. Inspect unfamiliar archives first and extract into a new, empty directory as an unprivileged user; extraction can overwrite existing files with matching paths.</p>
+
+        <h2 id="list">List Files Without Extracting</h2>
+
+        <pre tabindex="0" aria-label="List archive contents with details"><code class="language-bash">tar -tzvf archive.tar.gz</code></pre>
+
+        <p>Shows members and details such as permissions and sizes, without writing their contents to disk. For filenames only:</p>
+
+        <pre tabindex="0" aria-label="List filenames only"><code class="language-bash">tar -tzf archive.tar.gz</code></pre>
+
+        <h2 id="destination">Extract to a Specific Directory</h2>
+
+        <pre tabindex="0" aria-label="Create an extraction destination and extract into it"><code class="language-bash">mkdir -p /destination/path
+tar -xzvf archive.tar.gz -C /destination/path</code></pre>
+
+        <p>The destination must exist and be writable. Replace the generic path with your chosen directory. <code>-C</code> does not remove stored parent directories: an archive containing <code>myfolder/file.txt</code> produces <code>/destination/path/myfolder/file.txt</code>.</p>
+
+        <h2 id="formats">.tar vs .tar.gz vs .zip</h2>
+
+        <div class="reference-table" role="region" aria-label="Archive format comparison" tabindex="0"><table><thead><tr><th scope="col">Extension</th><th scope="col">What it contains</th><th scope="col">Typical use</th></tr></thead><tbody><tr><td><code>.tar</code></td><td>Files and directories bundled into one uncompressed archive.</td><td>Archive now; compress separately if needed.</td></tr><tr><td><code>.tar.gz</code></td><td>A tar archive compressed as a gzip stream.</td><td>Conventional tar + gzip format on Linux.</td></tr><tr><td><code>.zip</code></td><td>A ZIP archive, usually with each file compressed separately.</td><td>Exchange files with ZIP-compatible tools.</td></tr><tr><td><code>.tar.zip</code></td><td>A ZIP archive containing a tar file.</td><td>Unusual; use only when explicitly required.</td></tr></tbody></table></div>
+
+        <p><strong>tar is primarily an archiving tool; gzip is a compression tool.</strong> The <code>z</code> option connects them in one command. gzip alone does not bundle a directory tree into one archive. ZIP combines archiving with compression; see the <a href="https://infozip.sourceforge.net/Zip.html">Info-ZIP overview</a>.</p>
+
+        <pre tabindex="0" aria-label="Archiving and compression flow"><code class="language-text">directory/files
+      |
+      v
+     tar
+      |
+      v
+ archive.tar
+      |
+      v
+    gzip
+      |
+      v
+archive.tar.gz</code></pre>
+
+        <p>Changing an extension does not convert the format. Naming gzip output <code>.tar.zip</code> would be misleading; gzip and ZIP are different formats.</p>
+
+        <h2 id="tar-zip">Creating .tar.zip When Explicitly Required</h2>
+
+        <pre tabindex="0" aria-label="Create a tar archive and wrap it in ZIP"><code class="language-bash">tar -cvf myfolder.tar myfolder/
+zip myfolder.tar.zip myfolder.tar
+rm myfolder.tar</code></pre>
+
+        <p>Run these steps individually and check success before continuing: first bundle the directory into an uncompressed tar file, then place that file inside a ZIP archive, then remove only the intermediate tar file. The original directory remains. Use fresh archive names; <code>zip</code> can update an existing archive and retain older entries.</p>
+
+        <p>For a copyable sequence that tests the ZIP before removing the intermediate file:</p>
+
+        <pre tabindex="0" aria-label="Create and verify a tar.zip before cleanup"><code class="language-bash">tar -cvf myfolder.tar myfolder/ &amp;&amp;
+zip myfolder.tar.zip myfolder.tar &amp;&amp;
+unzip -t myfolder.tar.zip &amp;&amp;
+rm myfolder.tar</code></pre>
+
+        <p>The <code>&amp;&amp;</code> operators stop the sequence if a command fails. Unpacking requires two steps:</p>
+
+        <pre tabindex="0" aria-label="Extract the ZIP wrapper and then the tar archive"><code class="language-bash">unzip myfolder.tar.zip
+tar -xvf myfolder.tar</code></pre>
+
+        <p>Normally choose <code>.tar.gz</code> or create <code>.zip</code> directly instead; the extra tar layer is unnecessary unless a consumer explicitly requires it.</p>
+
+        <h2 id="examples">Common Examples</h2>
+
+        <h3>Uncompressed tar</h3>
+
+        <pre tabindex="0" aria-label="Create and extract an uncompressed tar archive"><code class="language-bash"># Create
+tar -cvf archive.tar directory/
+
+# Extract
+tar -xvf archive.tar</code></pre>
+
+        <h3>Compress an existing tar file</h3>
+
+        <pre tabindex="0" aria-label="Compress and decompress a tar file with gzip"><code class="language-bash"># Creates archive.tar.gz; removes archive.tar on success
+gzip archive.tar
+
+# Restores archive.tar; removes archive.tar.gz on success
+gunzip archive.tar.gz</code></pre>
+
+        <p>To keep the input file, write gzip’s output to a new filename instead:</p>
+
+        <pre tabindex="0" aria-label="Compress while retaining the original tar archive"><code class="language-bash">gzip -c archive.tar &gt; archive.tar.gz</code></pre>
+
+        <h3>Archive only the contents, or quote a path with spaces</h3>
+
+        <pre tabindex="0" aria-label="Control the stored root and quote paths"><code class="language-bash"># Store contents under ./ instead of directory/
+tar -czf archive.tar.gz -C directory .
+
+# Quote paths that contain spaces
+tar -czf archive.tar.gz "my folder/"</code></pre>
+
+        <p>These are alternative commands, not a sequence: each creates the output archive. Passing the directory itself includes hidden files; a shell wildcard such as <code>directory/*</code> usually omits hidden entries.</p>
+
+        <h3>Create a regular ZIP archive</h3>
+
+        <pre tabindex="0" aria-label="Create, list, and extract a ZIP archive"><code class="language-bash"># -r includes subdirectories recursively
+zip -r myfolder.zip myfolder/
+
+# List without extracting
+unzip -l myfolder.zip
+
+# Extract
+unzip myfolder.zip</code></pre>
+
+        <h3>Check compressed data</h3>
+
+        <pre tabindex="0" aria-label="Check gzip and ZIP integrity"><code class="language-bash">gzip -t archive.tar.gz
+unzip -t myfolder.zip</code></pre>
+
+        <p>A successful integrity test checks compressed data, not backup completeness or application consistency. Avoid archiving actively changing data when a consistent snapshot is required.</p>
+
+        <h2 id="cheat-sheet">Cheat Sheet</h2>
+
+        <div class="reference-table" role="region" aria-label="Archiving command cheat sheet" tabindex="0"><table><thead><tr><th scope="col">Task</th><th scope="col">Command</th></tr></thead><tbody><tr><td>Create .tar.gz</td><td><code>tar -czvf archive.tar.gz directory/</code></td></tr><tr><td>Create without verbose output</td><td><code>tar -czf archive.tar.gz directory/</code></td></tr><tr><td>Extract .tar.gz</td><td><code>tar -xzvf archive.tar.gz</code></td></tr><tr><td>Extract to an existing directory</td><td><code>tar -xzvf archive.tar.gz -C /destination/path</code></td></tr><tr><td>List .tar.gz</td><td><code>tar -tzvf archive.tar.gz</code></td></tr><tr><td>Create .tar</td><td><code>tar -cvf archive.tar directory/</code></td></tr><tr><td>Extract .tar</td><td><code>tar -xvf archive.tar</code></td></tr><tr><td>Compress an existing tar</td><td><code>gzip archive.tar</code></td></tr><tr><td>Create .zip</td><td><code>zip -r archive.zip directory/</code></td></tr><tr><td>List .zip</td><td><code>unzip -l archive.zip</code></td></tr><tr><td>Extract .zip</td><td><code>unzip archive.zip</code></td></tr><tr><td>Check gzip integrity</td><td><code>gzip -t archive.tar.gz</code></td></tr></tbody></table></div>
+      </div>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>Senior DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="../../index.html#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="../../index.html#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <a class="article-next" href="building-a-floating-ip-with-keepalived-for-linux-high-availability.html"><span><small>Next field note</small><strong>Building a Floating IP with Keepalived for Linux High Availability</strong></span><span aria-hidden="true">→</span></a>
+    </article>
+  </main>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="../../index.html">Home</a><a href="../index.html">Writing</a><a href="../../index.html#contact">Contact</a></div></footer>
+</body>
+</html>
