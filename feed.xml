@@ -5,8 +5,23 @@
     <link>https://hossein.cloud/blog/</link>
     <description>Practical notes on infrastructure, DevOps, LLM operations, and RAG systems.</description>
     <language>en</language>
-    <lastBuildDate>Tue, 29 Sep 2026 08:00:00 GMT</lastBuildDate>
+    <lastBuildDate>Mon, 05 Oct 2026 13:29:42 GMT</lastBuildDate>
     <atom:link href="https://hossein.cloud/feed.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Building a Floating IP with Keepalived for Linux High Availability</title>
+      <link>https://hossein.cloud/blog/posts/building-a-floating-ip-with-keepalived-for-linux-high-availability.html</link>
+      <guid isPermaLink="true">https://hossein.cloud/blog/posts/building-a-floating-ip-with-keepalived-for-linux-high-availability.html</guid>
+      <pubDate>Mon, 05 Oct 2026 13:29:42 GMT</pubDate>
+      <description>A practical two-VM Keepalived setup with VRRP, VIP failover drills, application health checks, and network troubleshooting.</description>
+      <category>Networking</category>
+    </item>
+    <item>
+      <title>Why my active-active HAProxy setup failed: ARP, shared VIPs, and the right way to design it</title>
+      <link>https://hossein.cloud/blog/posts/why-my-active-active-haproxy-setup-failed.html</link>
+      <guid isPermaLink="true">https://hossein.cloud/blog/posts/why-my-active-active-haproxy-setup-failed.html</guid>
+      <pubDate>Mon, 05 Oct 2026 08:00:00 GMT</pubDate>
+      <description>A real-world look at why one shared loopback VIP caused uneven traffic and stale ARP paths—and how VRRP, ECMP/BGP, or DNS change the design.</description>
+    </item>
     <item>
       <title>Making a Kubernetes workload boring to operate</title>
       <link>https://hossein.cloud/blog/posts/making-kubernetes-workloads-boring-to-operate.html</link>

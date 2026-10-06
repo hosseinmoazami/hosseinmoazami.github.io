@@ -1,8 +1,10 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-  <url><loc>https://hossein.cloud/</loc><lastmod>2026-09-29</lastmod></url>
+  <url><loc>https://hossein.cloud/</loc><lastmod>2026-10-05</lastmod></url>
   <url><loc>https://hossein.cloud/resume.html</loc><lastmod>2026-09-29</lastmod></url>
-  <url><loc>https://hossein.cloud/blog/</loc><lastmod>2026-09-29</lastmod></url>
+  <url><loc>https://hossein.cloud/blog/</loc><lastmod>2026-10-05</lastmod></url>
+  <url><loc>https://hossein.cloud/blog/posts/building-a-floating-ip-with-keepalived-for-linux-high-availability.html</loc><lastmod>2026-10-05</lastmod></url>
+  <url><loc>https://hossein.cloud/blog/posts/why-my-active-active-haproxy-setup-failed.html</loc><lastmod>2026-10-05</lastmod></url>
   <url><loc>https://hossein.cloud/blog/posts/making-kubernetes-workloads-boring-to-operate.html</loc><lastmod>2026-09-29</lastmod></url>
   <url><loc>https://hossein.cloud/blog/posts/treat-terraform-state-like-production-data.html</loc><lastmod>2026-09-29</lastmod></url>
   <url><loc>https://hossein.cloud/blog/posts/a-repeatable-path-from-alert-to-cause.html</loc><lastmod>2026-09-28</lastmod></url>

@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A real-world HAProxy case study on shared VIPs, uneven traffic, stale ARP entries, failover, VRRP, ECMP/BGP, and DNS round robin.">
+  <meta name="author" content="Hossein Moazami">
+  <meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/blog/posts/why-my-active-active-haproxy-setup-failed.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Why my active-active HAProxy setup failed: ARP, shared VIPs, and the right way to design it">
+  <meta property="og:description" content="A real-world HAProxy case study on shared VIPs, uneven traffic, stale ARP entries, failover, VRRP, ECMP/BGP, and DNS round robin.">
+  <meta property="og:url" content="https://hossein.cloud/blog/posts/why-my-active-active-haproxy-setup-failed.html">
+  <meta property="og:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <meta property="article:published_time" content="2026-10-05">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Why my active-active HAProxy setup failed: ARP, shared VIPs, and the right way to design it">
+  <meta name="twitter:description" content="A real-world HAProxy case study on shared VIPs, uneven traffic, stale ARP entries, failover, VRRP, ECMP/BGP, and DNS round robin.">
+  <meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta name="twitter:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <title>Why my active-active HAProxy setup failed: ARP, shared VIPs, and the right way to design it — Hossein Moazami</title>
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32">
+  <link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml">
+  <link rel="stylesheet" href="../../assets/style.css?v=20260930-4">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Why my active-active HAProxy setup failed: ARP, shared VIPs, and the right way to design it","datePublished":"2026-10-05","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/why-my-active-active-haproxy-setup-failed.html","image":"https://hossein.cloud/assets/og-card.png","description":"A real-world HAProxy case study on shared VIPs, uneven traffic, stale ARP entries, failover, VRRP, ECMP/BGP, and DNS round robin."}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap"><a class="brand" href="../../index.html" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a><nav class="nav" aria-label="Main navigation"><a href="../../index.html#work">Work</a><a href="../../index.html#experience">Experience</a><a href="../index.html" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="../../index.html#contact">Contact</a></nav></header>
+  <main id="main" class="article-shell">
+    <a class="back-link" href="../index.html"><span aria-hidden="true">←</span> All field notes</a>
+    <article>
+      <header class="article-header"><div class="post-meta"><span class="post-tag">Networking</span><time datetime="2026-10-05">October 5, 2026</time><span aria-hidden="true">/</span><span>11 min read</span></div><h1>Why my active-active HAProxy setup failed: ARP, shared VIPs, and the right way to design it</h1><p class="article-lead">Four HAProxy nodes owned one loopback VIP. DNS was simple and the service looked active-active. The Layer 2 network had a different idea.</p><p class="article-byline">By Hossein Moazami · Senior DevOps &amp; Platform Engineer</p></header>
+      <div class="article-body">
+        <p><em>Infrastructure identifiers have been anonymized. IP addresses use the documentation-only range <code>192.0.2.0/24</code>, and <code>hossein.cloud</code> stands in for the original service domain. The DNS records below are illustrative, not the domain’s actual configuration.</em></p>
+        <p>I had four HAProxy servers on the same internal network: <code>192.0.2.11</code>, <code>192.0.2.12</code>, <code>192.0.2.13</code>, and <code>192.0.2.14</code>. Each server also had <code>192.0.2.100</code> configured on a loopback interface. CoreDNS returned that shared address for <code>hossein.cloud</code>.</p>
+
+<pre tabindex="0" aria-label="CoreDNS record for the shared HAProxy VIP"><code>hossein.cloud.  IN  A  192.0.2.100</code></pre>
+
+        <p>The intention was straightforward: all four HAProxy instances would receive traffic at the same time. The result was not. Traffic was uneven, and when one node went down, part of the network continued sending frames for <code>192.0.2.100</code> to that node’s MAC address.</p>
+        <p>HAProxy was not the component choosing a destination. DNS returned one IP, and the Layer 2 network still needed one MAC address for that IP. In effect, the design delegated node selection to an ARP race: I had created four possible answers without adding a control plane that could select healthy nodes and distribute flows.</p>
+
+        <h2>The design looked active-active.</h2>
+<pre tabindex="0" aria-label="Current shared VIP architecture"><code>                         CoreDNS
+                 hossein.cloud -&gt; 192.0.2.100
+                              |
+                              v
+                    Layer 2 broadcast domain
+                              |
+         ARP: "Who has 192.0.2.100? Tell the requester."
+              /               |               |               \
+             /                |               |                \
+  192.0.2.11          192.0.2.12      192.0.2.13      192.0.2.14
+  HAProxy A            HAProxy B        HAProxy C        HAProxy D
+  lo: 192.0.2.100      lo: 192.0.2.100  lo: 192.0.2.100  lo: 192.0.2.100</code></pre>
+
+        <p>All four nodes could run HAProxy, but “all nodes are active” is not the same as “the network has a valid active-active path to all nodes.” A shared address on four loopbacks only gives each kernel a local route for the VIP. It does not define how upstream devices should divide connections, detect an unhealthy HAProxy process, or stop using a failed next hop.</p>
+
+        <h2>Follow the packet before blaming the load balancer.</h2>
+        <p>A client first resolves <code>hossein.cloud</code> and receives <code>192.0.2.100</code>. Its routing table then decides where the packet goes. If the VIP is on the client’s local subnet, the client resolves the VIP directly with ARP. If the client is on another subnet, it sends the packet to its default gateway; the router on the final hop may be the device that resolves <code>192.0.2.100</code> with ARP.</p>
+        <p>This distinction matters during troubleshooting. The stale entry may be on a client, a router, a firewall, a hypervisor, or another Layer 3 boundary. Flushing the neighbor table on an HAProxy server does nothing if a core router is the device holding the VIP-to-MAC mapping.</p>
+        <p>Once a device has selected a MAC address, the Ethernet frame is unicast to that MAC. The switch forwards it according to its MAC address table. The switch does not inspect the four HAProxy processes and choose the least busy one.</p>
+
+        <h2>ARP maps an IPv4 address to one Layer 2 destination.</h2>
+        <p>ARP answers a local question: which MAC address should receive frames for this IPv4 address on this Layer 2 segment?</p>
+        <ol>
+          <li>The sender broadcasts an ARP request: “Who has <code>192.0.2.100</code>?”</li>
+          <li>A host that considers the address local replies with its MAC address.</li>
+          <li>The sender stores the IP-to-MAC mapping in its neighbor table.</li>
+          <li>Subsequent packets are sent to that MAC until the entry is refreshed, replaced, or expires.</li>
+        </ol>
+        <p>With one legitimate owner, this is predictable. With four separate hosts claiming the same IP, multiple hosts may answer the same request. With Linux’s default <code>arp_ignore=0</code> behavior, all four kernels are eligible to reply for a local address configured on loopback. Which answer is accepted and retained depends on timing, the requesting device, kernel behavior, and network controls. Different clients can learn different MAC addresses. A centralized router may learn only one and send most routed traffic to a single HAProxy.</p>
+        <blockquote><p>ARP answers “where is this IP on this segment?” It does not answer “which healthy HAProxy should serve this connection?”</p></blockquote>
+        <p>That is why ARP is not a load-balancing algorithm. It has no health model, capacity signal, connection hashing, or requirement to split requests evenly. Even if different requesters happen to learn different nodes, the distribution is incidental rather than controlled.</p>
+
+        <h2>The neighbor cache explains the sticky failure.</h2>
+        <p>Linux exposes ARP state through the neighbor table. An entry can move through states such as <code>REACHABLE</code>, <code>STALE</code>, <code>DELAY</code>, <code>PROBE</code>, and <code>FAILED</code>. A stale entry is not immediately deleted; it can still be used while the kernel confirms reachability.</p>
+        <p>If a router has learned that <code>192.0.2.100</code> is behind HAProxy B’s MAC, it can continue using that mapping after B fails. The exact duration depends on neighbor timers and traffic. If the host is still alive but only the HAProxy process is down, its kernel may continue answering ARP indefinitely even though nothing useful is listening on the service port.</p>
+        <p>The neighbor table and the switch forwarding table are related but different. A client or router caches IP-to-MAC state; a switch learns MAC-to-port state. A switch noticing that a port went down does not rewrite the router’s neighbor entry to another HAProxy MAC, and the surviving nodes do not normally accept frames addressed to the failed node’s physical MAC.</p>
+        <p>A powered-off node, a failed interface, and a failed HAProxy process therefore produce different evidence. The symptom is consistent with stale ARP, but I still verify where the mapping lives and whether the failure is at Layer 2, Layer 3, or Layer 4 before calling it the root cause.</p>
+
+        <h2>Gratuitous ARP helps move an address; it does not distribute it.</h2>
+        <p>A Gratuitous ARP is an unsolicited, link-local ARP announcement for a host’s own address. It can update peer neighbor caches and switch learning after an IP moves to a new interface or server. High-availability tools commonly send several announcements after failover so the new owner becomes reachable quickly. It does not cross routers, and whether an unsolicited mapping is accepted varies by operating system and security policy.</p>
+        <p>This is useful when ownership is exclusive: the old owner stops serving the VIP, the new owner takes it, and the network is told about the change. If four active nodes keep announcing the same VIP, Gratuitous ARP can make the neighbor mapping churn between MAC addresses. Which mapping is retained remains implementation-dependent, and the result is still not traffic distribution.</p>
+
+        <h2>ARP flux settings can reduce ambiguity, not create active-active.</h2>
+        <p>Linux follows a weak host model by default: an address belongs to the host more than to one specific interface. On a multi-homed server this can cause ARP flux, where the host answers for an address through an unexpected interface. A VIP on <code>lo</code> can also influence replies seen on a physical interface.</p>
+        <p>Settings such as <code>arp_ignore</code> and <code>arp_announce</code> can make this behavior stricter. For example, <code>arp_ignore=1</code> limits replies to addresses configured on the receiving interface, while <code>arp_announce=2</code> chooses a more appropriate source address for outbound ARP requests. The effective behavior depends on both <code>conf/all</code> and <code>conf/&lt;interface&gt;</code>, so it must be tested against the interface and routing design. A strict <code>arp_ignore</code> policy can suppress every reply for a VIP that exists only on loopback and break direct reachability.</p>
+        <p>These settings are useful when one designated device should answer for a VIP, such as an LVS or VRRP design. They cannot decide which of four independent HAProxy nodes is healthy, hash flows across them, or withdraw a failed path. Tuning ARP behavior may hide one symptom while leaving the architecture undefined.</p>
+
+        <h2>Inspect the device that actually resolves the VIP.</h2>
+        <p>I start on the client or final-hop router that is expected to resolve <code>192.0.2.100</code>. On Linux, these commands show the current neighbor and routing decisions:</p>
+
+<pre tabindex="0" aria-label="Linux ARP and route troubleshooting commands"><code>ip neigh
+ip neigh show 192.0.2.100
+ip route get 192.0.2.100
+arp -a</code></pre>
+
+        <ul>
+          <li><code>ip neigh</code> lists neighbor entries, their interfaces, MAC addresses, and state.</li>
+          <li><code>ip neigh show 192.0.2.100</code> narrows the output to the shared VIP. I compare the learned MAC with the four server interfaces.</li>
+          <li><code>ip route get 192.0.2.100</code> shows the selected route, source address, next hop, and egress interface. It does not show the destination MAC, but it tells me which neighbor table and interface matter.</li>
+          <li><code>arp -a</code> is the older view. It is useful on systems where it is installed, but <code>ip neigh</code> exposes more state.</li>
+        </ul>
+        <p>I also capture ARP while clearing or reproducing the issue. Competing replies from different MAC addresses make the duplicate ownership visible:</p>
+
+<pre tabindex="0" aria-label="tcpdump command for observing ARP traffic"><code>sudo tcpdump -eni &lt;interface&gt; 'arp or host 192.0.2.100'</code></pre>
+
+        <p>On the HAProxy nodes, I verify interface addresses, local routes, listening sockets, and whether more than one node replies to the same ARP request. On routers and firewalls, I check for proxy ARP, static neighbor entries, EVPN suppression, or another feature that may own the mapping.</p>
+
+        <h2>Deleting ARP state is a diagnostic, not a repair.</h2>
+        <p>To force one entry to be resolved again on Linux, I can delete it from the interface that owns the neighbor relationship:</p>
+
+<pre tabindex="0" aria-label="Delete one Linux neighbor entry"><code>sudo ip neigh del 192.0.2.100 dev &lt;interface&gt;</code></pre>
+
+        <p>To flush the full neighbor table:</p>
+
+<pre tabindex="0" aria-label="Flush the Linux neighbor table"><code>sudo ip -s -s neigh flush all</code></pre>
+
+        <p>A full flush affects every neighbor, can create a burst of ARP resolution, and may cause brief disruption, so I use it carefully and usually prefer deleting one entry. More importantly, the next ARP request can learn the same failed MAC or another arbitrary HAProxy. A successful test after a flush proves that neighbor state was involved; it does not fix the design.</p>
+
+        <h2>Active-passive makes one Layer 2 owner explicit.</h2>
+        <p>The simpler correction is Keepalived with VRRP. All HAProxy nodes can have the same configuration, but only the elected active router—called <code>MASTER</code> in a typical Keepalived configuration—owns and advertises <code>192.0.2.100</code>. Backups monitor that owner, and a <code>track_script</code> or equivalent health check must also monitor the local HAProxy process. When the owner fails, a backup takes the VIP and sends Gratuitous ARP to update the network.</p>
+
+<pre tabindex="0" aria-label="Active-passive HAProxy architecture with VRRP"><code>CoreDNS: hossein.cloud -&gt; 192.0.2.100
+                              |
+                              v
+                   VRRP virtual IP owner
+                              |
+              +---------------+---------------+
+              |                               |
+       HAProxy A: MASTER               HAProxy B/C/D: BACKUP
+       owns 192.0.2.100                do not answer for the VIP
+
+Failover: elect new master -&gt; add VIP -&gt; send Gratuitous ARP</code></pre>
+
+        <p>This produces deterministic ownership and reliable failover, but it is active-passive for that VIP. It does not use all four nodes for the same service at once. Multiple VRRP groups and multiple VIPs can spread different services or DNS records across masters, but each VIP should still have one owner at a time.</p>
+
+        <h2>Real active-active needs a Layer 3 control plane.</h2>
+        <p>If all four HAProxy nodes must receive traffic for one service IP, I would keep the VIP as a loopback <code>/32</code>, place it in a routed service prefix, and advertise it from each node to upstream routers using BGP. With multipath enabled, the routers install equal-cost paths and stable per-flow ECMP selects a next hop. The selected next hops are the servers’ unique routed addresses, so ARP resolves <code>192.0.2.11</code>, <code>.12</code>, <code>.13</code>, or <code>.14</code> rather than asking four hosts to compete for one Layer 2 identity.</p>
+
+<pre tabindex="0" aria-label="Active-active HAProxy architecture with BGP and ECMP"><code>                 CoreDNS: hossein.cloud -&gt; 192.0.2.100
+                                      |
+                                      v
+                         Upstream L3 routers
+                      ECMP route for 192.0.2.100/32
+                         /       /       \       \
+                        /       /         \       \
+                 next hop .11 .12        .13     .14
+                   HAProxy A  HAProxy B  HAProxy C  HAProxy D
+                   advertises the service /32 while healthy</code></pre>
+
+        <p>This design requires clients to reach the VIP through the routing layer. If a client still considers <code>192.0.2.100</code> directly connected, it can ARP for the VIP and bypass ECMP entirely. In practice, the service IP should come from a routed service prefix—or be reached through an explicit host route—rather than sit inside the clients’ ordinary Layer 2 subnet.</p>
+        <p>The route must be tied to service health. If HAProxy is unhealthy, that node should withdraw the prefix. BFD can speed up detection of a failed routing peer or link, but application health still needs its own signal. New flows then avoid the withdrawn path.</p>
+        <p>ECMP is flow-aware routing, not perfect quarter-by-quarter request balancing. Hash inputs, NAT, long-lived connections, and unequal flow sizes can still create skew. For TCP, the design should use stable per-flow hashing rather than per-packet ECMP, which can reorder packets. Existing HAProxy connections can fail when a next hop disappears; routing can steer new flows after convergence, but it cannot migrate established TCP state. The improvement is that path selection and failure removal are explicit, observable, and controlled by routing.</p>
+
+        <h2>DNS round robin is simpler, but failover is eventually consistent.</h2>
+        <p>Another option is to publish the four unique HAProxy addresses instead of one shared VIP:</p>
+
+<pre tabindex="0" aria-label="DNS round robin records for HAProxy nodes"><code>hossein.cloud.  30  IN  A  192.0.2.11
+hossein.cloud.  30  IN  A  192.0.2.12
+hossein.cloud.  30  IN  A  192.0.2.13
+hossein.cloud.  30  IN  A  192.0.2.14</code></pre>
+
+        <p>Resolvers can rotate the record order, and clients choose an address. This removes the duplicate Layer 2 ownership and can provide coarse distribution without BGP. CoreDNS record ordering is not a service-health decision, however, and DNS is still not a connection-aware load balancer.</p>
+        <p>Recursive resolvers, operating systems, runtimes, and applications all cache DNS. TTL is a request, not a guarantee that every client will refresh on time. Some clients pin one address, some try only the first, and existing connections ignore DNS changes. A health-aware DNS system can remove a failed record, but cached answers can continue sending traffic to it until they expire. Lowering the TTL of the current single <code>192.0.2.100</code> record would not change any of this: every answer would still lead to the same ARP problem.</p>
+
+        <h2>The recommended design depends on the real requirement.</h2>
+        <ol>
+          <li><strong>If one HAProxy can handle the load:</strong> use Keepalived/VRRP, one VIP owner, HAProxy health tracking, and tested Gratuitous ARP behavior. This is the smallest reliable design.</li>
+          <li><strong>If all four nodes must be active behind one IP:</strong> move the service boundary to Layer 3. Put the VIP in a routed service prefix, advertise it as a <code>/32</code>, use BGP with per-flow ECMP, and withdraw the route when the service is unhealthy. Ensure every client path traverses that Layer 3 decision point.</li>
+          <li><strong>If routing integration is unavailable:</strong> use multiple unique A records with health-aware DNS, or place a proper redundant Layer 4 load-balancing tier in front. Accept that DNS failover is cache-dependent.</li>
+        </ol>
+        <p>For this network, my first question would be whether one HAProxy node has enough capacity. If yes, VRRP is operationally simpler. If active-active capacity is a hard requirement and the core network supports dynamic routing, BGP/ECMP is the clean design. I would not keep four independent Layer 2 owners for <code>192.0.2.100</code> and try to tune ARP until it behaves like a load balancer.</p>
+
+        <h2>Conclusion.</h2>
+        <p>The failure was not that a loopback address cannot be used as a service VIP. Loopbacks are common in routed anycast and ECMP designs. The failure was giving the same VIP to four hosts on one Layer 2 segment without a mechanism that controlled ownership or advertised multiple healthy routes.</p>
+        <p>ARP can locate a neighbor. Gratuitous ARP can announce that an address moved. Linux ARP settings can reduce ambiguous replies. None of them provides active-active load balancing by itself. A correct design needs either one elected owner with VRRP, multiple routed next hops with ECMP/BGP, or multiple unique addresses with the understood limitations of DNS caching.</p>
+      </div>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>Senior DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="../../index.html#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="../../index.html#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <a class="article-next" href="making-kubernetes-workloads-boring-to-operate.html"><span><small>Next field note</small><strong>Making a Kubernetes workload boring to operate</strong></span><span aria-hidden="true">→</span></a>
+    </article>
+  </main>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="../../index.html">Home</a><a href="https://github.com/hosseinmoazami" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:hossein.moazami.goodarzi@gmail.com">Email</a></div></footer>
+</body>
+</html>

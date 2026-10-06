@@ -1,0 +1,307 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A practical two-VM Keepalived setup with VRRP, VIP failover drills, application health checks, and network troubleshooting.">
+  <meta name="author" content="Hossein Moazami">
+  <meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/blog/posts/building-a-floating-ip-with-keepalived-for-linux-high-availability.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Building a Floating IP with Keepalived for Linux High Availability — Hossein Moazami">
+  <meta property="og:description" content="A practical two-VM Keepalived setup with VRRP, VIP failover drills, application health checks, and network troubleshooting.">
+  <meta property="og:url" content="https://hossein.cloud/blog/posts/building-a-floating-ip-with-keepalived-for-linux-high-availability.html">
+  <meta property="og:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <meta property="article:published_time" content="2026-10-05">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Building a Floating IP with Keepalived for Linux High Availability — Hossein Moazami">
+  <meta name="twitter:description" content="A practical two-VM Keepalived setup with VRRP, VIP failover drills, application health checks, and network troubleshooting.">
+  <meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta name="twitter:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <title>Building a Floating IP with Keepalived for Linux High Availability — Hossein Moazami</title>
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32">
+  <link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml">
+  <link rel="stylesheet" href="../../assets/style.css?v=20260930-4">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Building a Floating IP with Keepalived for Linux High Availability","datePublished":"2026-10-05","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/building-a-floating-ip-with-keepalived-for-linux-high-availability.html","image":"https://hossein.cloud/assets/og-card.png","description":"A practical two-VM Keepalived setup with VRRP, VIP failover drills, application health checks, and network troubleshooting."}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="../../index.html" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a>
+    <nav class="nav" aria-label="Main navigation"><a href="../../index.html#work">Work</a><a href="../../index.html#experience">Experience</a><a href="../index.html" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="../../index.html#contact">Contact</a></nav>
+  </header>
+  <main id="main" class="article-shell">
+    <a class="back-link" href="../index.html"><span aria-hidden="true">←</span> All field notes</a>
+    <article>
+      <header class="article-header"><div class="post-meta"><span class="post-tag">Networking</span><time datetime="2026-10-05">October 5, 2026</time><span aria-hidden="true">/</span><span>14 min read</span></div><h1>Building a Floating IP with Keepalived for Linux High Availability</h1><p class="article-lead">A practical two-VM Keepalived setup with VRRP, VIP failover drills, application health checks, and network troubleshooting.</p><p class="article-byline">By Hossein Moazami · Senior DevOps &amp; Platform Engineer</p></header>
+      <div class="article-body">
+        <p>This is a reproducible lab design using example addresses and generic VM labels. VM-01 is <code>192.168.50.11</code>, VM-02 is <code>192.168.50.12</code>, and clients connect to <code>192.168.50.10</code>. Both VMs use <code>ens18</code> on <code>192.168.50.0/24</code>. No production identifiers or credentials are needed.</p>
+
+        <p>The operational requirement is simple: keep the client address stable while the server behind it changes. I would use this pattern for a redundant reverse proxy or another service that can run independently on either VM. Moving the address does not replicate application data or preserve existing TCP connections; those are separate design decisions.</p>
+
+        <h2>One address, one elected owner.</h2>
+
+        <p>A floating IP, or virtual IP (VIP), is an additional address that can move between machines. Each VM keeps its permanent address for administration and peer communication. Only the elected node should add the VIP to its interface. Clients continue using the same destination after failover.</p>
+
+        <p>Keepalived is the Linux daemon that manages the address and runs the election through VRRP, the Virtual Router Redundancy Protocol. The active node sends advertisements; a backup takes over when those advertisements stop. This is active-passive availability for one VIP, not load balancing across both VMs.</p>
+
+        <pre tabindex="0" aria-label="Normal floating IP ownership"><code>                    192.168.50.10
+                     Floating VIP
+                          |
+                 +--------+--------+
+                 |                 |
+          +--------------+  +--------------+
+          |    VM-01     |  |    VM-02     |
+          |192.168.50.11 |  |192.168.50.12 |
+          | MASTER      |  | BACKUP      |
+          | Priority 150|  | Priority 100|
+          +--------------+  +--------------+
+           owns the VIP     no VIP assigned
+
+          Same Layer-2 network: 192.168.50.0/24</code></pre>
+
+        <p>Under normal conditions, VM-01 wins with priority 150. If it stops advertising, VM-02 promotes itself, adds the VIP, and announces the new address-to-MAC mapping. When the healthy higher-priority VM returns, default preemption moves ownership back. These guarantees depend on the peers being able to hear one another: VRRP alone cannot enforce exclusive ownership during a partition.</p>
+
+        <h2>Confirm the network before installing anything.</h2>
+
+        <p>Start with two Linux VMs, administrative access, static primary addresses, and an unused VIP reserved outside the DHCP allocation pool. Both VMs need the same VLAN or virtual Layer-2 segment. A matching subnet mask is not proof of shared Layer 2: isolated virtual networks can use identical address ranges.</p>
+
+        <pre tabindex="0" aria-label="Identify the interface and routes on both VMs"><code>ip -br link
+ip -br -4 addr
+ip route
+ip addr show dev ens18</code></pre>
+
+        <p>Expect <code>192.168.50.11/24</code> on VM-01 and <code>192.168.50.12/24</code> on VM-02. Verify the virtual switch, VLAN, and port-group configuration with the virtualization platform. Then check the path in both directions:</p>
+
+        <pre tabindex="0" aria-label="Verify the directly connected peer path"><code># VM-01
+ip route get 192.168.50.12
+ping -c 3 192.168.50.12
+ip neigh show 192.168.50.12 dev ens18
+
+# VM-02
+ip route get 192.168.50.11
+ping -c 3 192.168.50.11
+ip neigh show 192.168.50.11 dev ens18</code></pre>
+
+        <p>For this design, the route should use <code>ens18</code> directly, without a gateway, and the neighbor entry should resolve. Proxy ARP can make a routed environment look directly connected, so confirm the actual network configuration as well. If ICMP is filtered, use ARP capture and platform evidence instead of interpreting a failed ping as proof of isolation.</p>
+
+        <p>The network must permit an additional IP on either VM and accept gratuitous ARP when ownership changes. Check anti-spoofing, allowed-address-pair settings, and virtual switch policies. Some cloud networks require a provider API to move an address; adding it inside the guest is insufficient. Do not statically add the VIP in Netplan, NetworkManager, or both guests: Keepalived must control it.</p>
+
+        <h2>Install Keepalived on both VMs.</h2>
+
+        <pre tabindex="0" aria-label="Ubuntu and Debian package installation"><code>sudo apt update
+sudo apt install -y keepalived iputils-arping tcpdump curl
+sudo systemctl stop keepalived
+keepalived --version</code></pre>
+
+        <p>On a RHEL-family distribution, the equivalent package installation is <code>sudo dnf install -y keepalived iputils tcpdump curl</code>. Stop the service there too while preparing the configuration. Package versions differ; use <code>man keepalived.conf</code> for the installed version when an option is rejected.</p>
+
+        <p>Before starting either instance, verify the VIP is unallocated in your address inventory and probe for an existing owner from the example segment:</p>
+
+        <pre tabindex="0" aria-label="Probe the VIP before either instance starts"><code>sudo arping -D -I ens18 -c 3 192.168.50.10</code></pre>
+
+        <p>Investigate any reply before proceeding. Silence alone does not establish that an address is free: a powered-off machine or a filtering policy can hide a conflict.</p>
+
+        <h2>Configure VM-01.</h2>
+
+        <p>Save the following as <code>/etc/keepalived/keepalived.conf</code> on VM-01 using <code>sudoedit /etc/keepalived/keepalived.conf</code>. This is the complete baseline file; it deliberately has no application health check yet.</p>
+
+        <pre tabindex="0" aria-label="Complete VM-01 Keepalived configuration"><code>vrrp_instance VI_SERVICE {
+    state BACKUP
+    interface ens18
+    virtual_router_id 50
+    priority 150
+    advert_int 1
+    version 3
+
+    virtual_ipaddress {
+        192.168.50.10/24 dev ens18
+    }
+}</code></pre>
+
+        <h2>Configure VM-02.</h2>
+
+        <p>Save this complete file at the same path on VM-02. The priority is the only difference.</p>
+
+        <pre tabindex="0" aria-label="Complete VM-02 Keepalived configuration"><code>vrrp_instance VI_SERVICE {
+    state BACKUP
+    interface ens18
+    virtual_router_id 50
+    priority 100
+    advert_int 1
+    version 3
+
+    virtual_ipaddress {
+        192.168.50.10/24 dev ens18
+    }
+}</code></pre>
+
+        <p>Both files intentionally start with <code>state BACKUP</code>. This is an initial state, not a permanent role. VM-01 still becomes MASTER because it has the higher priority. Starting both as backups lets the election establish ownership and also supports a later decision to delay or disable preemption.</p>
+
+        <h2>Understand the settings that control ownership.</h2>
+
+        <ul><li><code>state</code>: initial VRRP state. <code>MASTER</code> is not an instruction to remain master regardless of peers; the election and health state still matter.</li><li><code>interface ens18</code>: interface used by this instance. It must exist, be up, and reach the peer on the intended segment.</li><li><code>virtual_router_id 50</code>: identifies this virtual router. Both peers must match. Choose a different ID for unrelated VRRP groups sharing the segment; the normal range is 1–255.</li><li><code>priority</code>: higher effective priority wins. These examples use 150 and 100. Health tracking can change eligibility or effective priority. Avoid equal priorities; the higher primary IP breaks a tie. Priority 255 is reserved for the address-owner role, not a general “prefer this VM” setting.</li><li><code>advert_int 1</code>: the master advertises once per second. This is not a promise of one-second failover.</li><li><code>version 3</code>: explicitly selects VRRPv3 on both peers, avoiding reliance on package defaults.</li><li><code>virtual_ipaddress</code>: addresses Keepalived adds on promotion and removes on demotion or orderly shutdown. Here the VIP belongs on <code>ens18</code>, with the example subnet prefix.</li></ul>
+
+        <p>The legacy <code>authentication</code> block sometimes shown in older examples contains <code>auth_type</code> and <code>auth_pass</code>. It is omitted here: legacy PASS authentication is not part of VRRPv3 and must not be treated as a security boundary. Support and behavior vary by protocol version and implementation. A shared <code>auth_pass</code> does not protect against untrusted network access. Consult the <a href="https://www.keepalived.org/documentation/keepalived-conf/">Keepalived configuration reference</a> for version-specific behavior, and restrict VRRP at the network boundary.</p>
+
+        <p>With the default advertisement timeout calculation, a priority-100 backup waits roughly <code>3 × 1 + (256 − 100) / 256 ≈ 3.61 seconds</code> after its last valid advertisement. An orderly stop can announce priority zero and shorten the wait. CPU scheduling, packet loss, ARP convergence, and application readiness all affect the outage observed by a client. The election and timer rules are specified in <a href="https://www.rfc-editor.org/rfc/rfc9568.html">RFC 9568</a>.</p>
+
+        <h2>Allow VRRP, then validate and start.</h2>
+
+        <p>VRRP uses IP protocol number <strong>112</strong>, not TCP or UDP port 112. Default IPv4 advertisements go to the well-known multicast address <code>224.0.0.18</code>, a protocol constant rather than an infrastructure address. Permit advertisements from the two example node addresses on the intended interface in both directions, including any output filtering. Check guest firewalls, hypervisor filtering, and network ACLs. Opening an application port alone does not allow the election to work.</p>
+
+        <p>Integrate these requirements into the existing firewall policy; do not flush its rules to test failover. Also allow the client-facing service port to the VIP on either node. ICMP must be allowed for the ping test below, but application traffic needs its own checks.</p>
+
+        <pre tabindex="0" aria-label="Validate and enable Keepalived on each VM"><code>sudo keepalived --config-test -f /etc/keepalived/keepalived.conf
+sudo systemctl enable --now keepalived
+systemctl status keepalived --no-pager
+sudo journalctl -u keepalived -b --no-pager -n 50</code></pre>
+
+        <p>Only enable the service after the configuration test succeeds. The test catches parsing and configuration problems, not firewall or Layer-2 failures. Keepalived documents its command-line options in the <a href="https://www.keepalived.org/documentation/user-guide/programs-synopsis/">program reference</a>.</p>
+
+        <pre tabindex="0" aria-label="Inspect address ownership on both nodes"><code>ip addr
+ip addr show dev ens18
+ip -o -4 addr show dev ens18
+sudo journalctl -u keepalived -f</code></pre>
+
+        <p>After election settles, VM-01 should have its permanent address plus <code>192.168.50.10/24</code>; VM-02 should have only <code>192.168.50.12/24</code>. Look for MASTER and BACKUP transitions in the logs. Exact log wording varies. A systemd status of “active” does not tell you which node owns the VIP.</p>
+
+        <h2>Run the failover drill from a third machine.</h2>
+
+        <p>First confirm that only VM-01 owns the VIP. From another machine on a network that can reach it, leave this running:</p>
+
+        <pre tabindex="0" aria-label="Observe client reachability"><code>ping -D -i 0.2 192.168.50.10</code></pre>
+
+        <p>Then stop Keepalived on VM-01:</p>
+
+        <pre tabindex="0" aria-label="Trigger an orderly failover on VM-01"><code>sudo systemctl stop keepalived</code></pre>
+
+        <p>On VM-02, watch the transition and verify the address was added. Also check VM-01 to confirm it removed the VIP:</p>
+
+        <pre tabindex="0" aria-label="Confirm takeover on VM-02"><code>sudo journalctl -u keepalived --since "2 minutes ago" --no-pager
+ip addr show dev ens18</code></pre>
+
+        <p>Expected outcome: VM-02 becomes MASTER, <code>192.168.50.10/24</code> appears on its interface, and ping resumes after a possible short gap. Record the actual loss rather than assuming the configured timer equals the outage.</p>
+
+        <pre tabindex="0" aria-label="Return VM-01 to service"><code>sudo systemctl start keepalived</code></pre>
+
+        <p>Default preemption lets healthy VM-01, priority 150, reclaim the VIP from VM-02, priority 100. Confirm that VM-02 returns to BACKUP and removes the address. This second move can cause another interruption. If automatic failback is undesirable, <code>nopreempt</code> on both instances keeps an established healthy master in place; retain <code>state BACKUP</code>. That changes the requirement: VM-01 is then preferred at election time, not guaranteed to regain ownership on return.</p>
+
+        <p>An orderly service stop is only the first test. In an isolated lab, repeat with a VM power-off and a failed interface while keeping console access. An abrupt failure relies on missed advertisements and can take longer. Test a daemon crash separately: an unclean exit can leave a kernel address behind, and service supervision may restart the daemon. Confirm address cleanup and recovery instead of assuming every failure behaves like <code>systemctl stop</code>.</p>
+
+        <h2>The VIP also needs a new ARP mapping.</h2>
+
+        <p>Without a virtual MAC configuration, each VM uses its own interface MAC. Clients on the same subnet—and the final-hop router for routed clients—cache the VIP-to-MAC mapping. After takeover, they may still send frames to the old owner until that mapping changes.</p>
+
+        <p>Keepalived sends gratuitous ARP announcements when it becomes master. These tell peers that the VIP is now reachable through the new owner and help update network learning. They are local to the Layer-2 segment; they do not travel through routers. Filtering, static neighbor entries, or ARP suppression can delay or prevent the update.</p>
+
+        <pre tabindex="0" aria-label="Observe advertisements and ARP on each VM"><code>sudo tcpdump -ni ens18 -e 'ip proto 112 or arp'</code></pre>
+
+        <p>If VM-02 owns the VIP but a client cannot reach it, inspect <code>ip neigh show 192.168.50.10</code> on the device that actually resolves the VIP. For a routed client, that may be the final-hop router. Clearing one stale neighbor entry can help diagnose the problem; routine cache flushing is not a failover design.</p>
+
+        <h2>Track application readiness, not just a running daemon.</h2>
+
+        <p>The baseline detects a missing VRRP peer. It does not notice an application that has stopped serving while Keepalived remains healthy. A process-existence check such as <code>pgrep</code> can detect a missing process, but a running process may be deadlocked, unable to reach storage, or returning errors. Prefer a bounded readiness request that represents whether this node can serve traffic.</p>
+
+        <p>For this optional example, the application on each VM exposes <code>/ready</code> on its permanent address, port 8080, and returns exactly HTTP 200 when ready. Use the local node address, never the VIP: probing the VIP from the backup could accidentally test the other node. Both applications must be able to run without owning the VIP; bind appropriately, for example to all intended local addresses, and restrict access with the firewall.</p>
+
+        <p>Create <code>/usr/local/bin/check-vip-service</code> on VM-01 with the following content. On VM-02, use the same script with <code>192.168.50.12</code> in the URL. The executable and its parent directories must be protected against writes by unprivileged accounts.</p>
+
+        <pre tabindex="0" aria-label="Readiness probe script for VM-01"><code>#!/bin/sh
+status=$(/usr/bin/curl --silent --show-error --noproxy '*' \
+    --connect-timeout 1 --max-time 2 \
+    --output /dev/null --write-out '%{http_code}' \
+    http://192.168.50.11:8080/ready) || exit 1
+[ "$status" = "200" ]</code></pre>
+
+        <pre tabindex="0" aria-label="Set probe ownership and permissions on each VM"><code>sudo chown root:root /usr/local/bin/check-vip-service
+sudo chmod 0755 /usr/local/bin/check-vip-service
+sudo -u nobody /usr/local/bin/check-vip-service
+echo $?</code></pre>
+
+        <p>Here <code>root</code> and <code>nobody</code> are standard OS accounts, not environment-specific identities. The last command should print zero for a ready service. Use a dedicated unprivileged service account in production and verify its access; this example uses <code>nobody</code> for a credential-free HTTP request. Check SELinux or AppArmor policy if execution is denied.</p>
+
+        <p>On both nodes, add these top-level blocks <em>before</em> the existing <code>vrrp_instance</code>. There should be one global block, so merge settings if a file already has one:</p>
+
+        <pre tabindex="0" aria-label="Application health tracking declarations"><code>global_defs {
+    enable_script_security
+}
+
+vrrp_script check_service {
+    script "/usr/local/bin/check-vip-service"
+    user nobody
+    interval 3
+    timeout 2
+    fall 2
+    rise 2
+    weight 0
+    init_fail
+}</code></pre>
+
+        <p>Add this block <em>inside</em> <code>vrrp_instance VI_SERVICE</code> on each VM:</p>
+
+        <pre tabindex="0" aria-label="Attach the readiness check to the VIP instance"><code>track_script {
+    check_service
+}</code></pre>
+
+        <p>A zero weight makes failed health tracking put the instance into FAULT, removing its eligibility and VIP. Two consecutive failures trigger that decision; two successes permit recovery. <code>init_fail</code> requires health to be established at startup. This policy allows neither unhealthy node to advertise the service: if both fail their checks, neither should own the VIP. Confirm these tracking semantics against the <a href="https://www.keepalived.org/documentation/keepalived-conf/">installed-version configuration reference</a>.</p>
+
+        <p>For a soft preference instead, replace <code>weight 0</code> with <code>weight -60</code>. An unhealthy VM-01 then falls from 150 to 90, below a healthy VM-02 at 100. A penalty of only 20 would leave VM-01 at 130 and would not produce the intended takeover. Weighted tracking depends on preemption: do not combine it with <code>nopreempt</code> and expect a healthy backup to displace an unhealthy, still-advertising master.</p>
+
+        <p>The trade-off is explicit. With a negative weight, an unhealthy node remains eligible, so one can still own the VIP if both applications fail. Use the zero-weight FAULT policy when serving from an unhealthy node is unacceptable. Avoid a readiness check that makes both nodes flap because of one shared dependency unless withdrawing the entire service is the intended response.</p>
+
+        <pre tabindex="0" aria-label="Validate and reload the health configuration on each VM"><code>sudo keepalived --config-test -f /etc/keepalived/keepalived.conf
+sudo systemctl reload keepalived
+sudo journalctl -u keepalived --since "2 minutes ago" --no-pager</code></pre>
+
+        <p>Reload only after validation passes. In the lab, make VM-01’s readiness endpoint return a non-200 status while keeping Keepalived running. Verify takeover, then restore readiness and observe failback. Test both endpoints failing as well. Measure service requests through <code>http://192.168.50.10:8080/ready</code> from the third machine; ping alone cannot prove application recovery. The probe detects local readiness, so an external service monitor is still necessary.</p>
+
+        <h2>Use unicast when multicast is unavailable.</h2>
+
+        <p>If the platform blocks VRRP multicast but supports the shared VIP and ARP movement, use Keepalived’s unicast peer mode. Keep the baseline settings and add the following inside VM-01’s instance:</p>
+
+        <pre tabindex="0" aria-label="Unicast additions on VM-01"><code>unicast_src_ip 192.168.50.11
+unicast_peer {
+    192.168.50.12
+}</code></pre>
+
+        <p>On VM-02, reverse the source and peer:</p>
+
+        <pre tabindex="0" aria-label="Unicast additions on VM-02"><code>unicast_src_ip 192.168.50.12
+unicast_peer {
+    192.168.50.11
+}</code></pre>
+
+        <p>Configure both ends consistently, validate, and reload. Permit IP protocol 112 between the permanent addresses in both directions. Unicast changes advertisement delivery; it neither authenticates peers nor makes a guest-managed VIP work on a network that forbids address movement. This article still assumes a common Layer-2 service segment.</p>
+
+        <h2>Troubleshoot ownership before changing timers.</h2>
+
+        <ul><li><strong>Both nodes say MASTER:</strong> capture protocol 112 on both interfaces. Check bidirectional firewall rules, multicast support or reciprocal unicast peers, matching VRRP version, and matching instance settings. Ping between primary addresses does not prove advertisements pass. Treat duplicate VIP ownership as an incident: use console access to stop or isolate one owner while restoring peer communication.</li><li><strong>Neither node owns the VIP:</strong> inspect the configuration-test output, interface link state, and logs for FAULT or script failures. Run the readiness probe as its configured account. Check permissions and mandatory-access-control denials.</li><li><strong>Wrong interface:</strong> compare <code>ip -br addr</code> with the config. An interface name copied from another VM may exist but connect to the wrong network.</li><li><strong>Unexpected elections:</strong> check for another group using <code>virtual_router_id 50</code> on the same segment. The ID must match within this pair and be distinct from unrelated groups.</li><li><strong>VIP moves but clients fail:</strong> inspect gratuitous ARP, neighbor caches, VIP anti-spoofing rules, and application binding. Check <code>ss -lntp</code> to confirm the expected listener; verify service-port firewall rules on both VMs.</li><li><strong>Only one direction works:</strong> inspect output ACLs and virtual switch filters as well as guest input rules. Capture at both ends to distinguish “sent” from “received.”</li><li><strong>Frequent transitions:</strong> inspect timestamped Keepalived logs alongside packet loss, host CPU contention, VM pauses, and probe latency. Do not reduce advertisement timers to hide an unstable network.</li></ul>
+
+        <pre tabindex="0" aria-label="Focused diagnostic commands"><code>sudo journalctl -u keepalived -b --no-pager -n 100
+ip -br -4 addr show dev ens18
+ip route
+sudo ss -lntp
+sudo tcpdump -ni ens18 -e 'ip proto 112 or arp'</code></pre>
+
+        <h2>Define the production failure contract.</h2>
+
+        <p>A two-node VRRP pair has no quorum or fencing. If advertisements are partitioned while both nodes remain connected to clients, each can consider itself master. The design cannot promise “only one owner at all times” under that failure. For stateful writers, use an application cluster with appropriate consensus or fencing; moving a VIP is not a substitute. The <a href="https://www.rfc-editor.org/rfc/rfc9568.html">VRRP specification</a> describes the protocol’s scope and security considerations.</p>
+
+        <p>Place the VMs in independent failure domains where possible, while preserving the required network connectivity. Keep application configuration and certificates synchronized through a separate deployment process, and design data replication independently. A failed hypervisor, shared switch, or shared storage system can still take down both nodes.</p>
+
+        <p>Before production, record the behavior for orderly stops, abrupt VM failure, application failure, both applications unhealthy, peer-network partition, and recovery of the preferred node. Observe from a real client path and count failed requests as well as missed pings. Existing connections may reset, so clients need sensible reconnection behavior. Alert on dual ownership, no owner, FAULT state, and repeated transitions.</p>
+
+        <p>The useful outcome is a repeatable handover: one eligible owner, a reachable service, and evidence showing what happened when either failed. A green Keepalived service status is only the start of that verification.</p>
+      </div>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>Senior DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="../../index.html#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="../../index.html#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <a class="article-next" href="why-my-active-active-haproxy-setup-failed.html"><span><small>Next field note</small><strong>Why my active-active HAProxy setup failed: ARP, shared VIPs, and the right way to design it</strong></span><span aria-hidden="true">→</span></a>
+    </article>
+  </main>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="../../index.html">Home</a><a href="../index.html">Writing</a><a href="../../index.html#contact">Contact</a></div></footer>
+</body>
+</html>
