@@ -1,0 +1,260 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A MongoDB restore runbook covering Docker, gzip archives, authentication, verification, and common restore failures.">
+  <meta name="author" content="Hossein Moazami">
+  <meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/blog/posts/restoring-a-gzip-mongodb-backup-in-docker.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Restoring a Gzip-Compressed MongoDB Backup in Docker — Hossein Moazami">
+  <meta property="og:description" content="A MongoDB restore runbook covering Docker, gzip archives, authentication, verification, and common restore failures.">
+  <meta property="og:url" content="https://hossein.cloud/blog/posts/restoring-a-gzip-mongodb-backup-in-docker.html">
+  <meta property="og:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <meta property="article:published_time" content="2026-10-06">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Restoring a Gzip-Compressed MongoDB Backup in Docker — Hossein Moazami">
+  <meta name="twitter:description" content="A MongoDB restore runbook covering Docker, gzip archives, authentication, verification, and common restore failures.">
+  <meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta name="twitter:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <title>Restoring a Gzip-Compressed MongoDB Backup in Docker — Hossein Moazami</title>
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32">
+  <link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml">
+  <link rel="stylesheet" href="../../assets/style.css?v=20260930-4">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Restoring a Gzip-Compressed MongoDB Backup in Docker","datePublished":"2026-10-06","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/restoring-a-gzip-mongodb-backup-in-docker.html","image":"https://hossein.cloud/assets/og-card.png","description":"A MongoDB restore runbook covering Docker, gzip archives, authentication, verification, and common restore failures."}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="../../index.html" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a>
+    <nav class="nav" aria-label="Main navigation"><a href="../../index.html#work">Work</a><a href="../../index.html#experience">Experience</a><a href="../index.html" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="../../index.html#contact">Contact</a></nav>
+  </header>
+  <main id="main" class="article-shell">
+    <a class="back-link" href="../index.html"><span aria-hidden="true">←</span> All field notes</a>
+    <article>
+      <header class="article-header"><div class="post-meta"><span class="post-tag">MongoDB</span><time datetime="2026-10-06">October 6, 2026</time><span aria-hidden="true">/</span><span>8 min read</span></div><h1>Restoring a Gzip-Compressed MongoDB Backup in Docker</h1><p class="article-lead">A MongoDB restore runbook covering Docker, gzip archives, authentication, verification, and common restore failures.</p><p class="article-byline">By Hossein Moazami · Senior DevOps &amp; Platform Engineer</p></header>
+      <div class="article-body">
+        <h2 id="overview">Overview</h2>
+
+        <p>Restore a MongoDB Database Tools archive compressed with gzip into an existing MongoDB Docker container. The example backup filename is <code>mongobackup-2025-11-03-1152.gz</code>; it is a sample, not evidence of the file’s actual format. This runbook assumes the backup was produced with archive + gzip options:</p>
+
+        <pre tabindex="0" aria-label="Example backup format"><code class="language-bash">mongodump --archive=mongobackup.gz --gzip</code></pre>
+
+        <p>Replace every angle-bracket placeholder before running a command. Commands labelled <strong>Host</strong> run on the Docker host; commands labelled <strong>Container</strong> run inside the MongoDB container. <code>localhost</code> is the local connection target, not an infrastructure hostname.</p>
+
+        <p>Jump to: <a href="#authenticated">Authenticated restore</a> · <a href="#auth-error">Authentication error</a> · <a href="#host">Host restore</a> · <a href="#verify">Verification</a> · <a href="#formats">Backup formats</a> · <a href="#troubleshooting">Troubleshooting</a> · <a href="#reference">Command reference</a> · <a href="#procedure">Recommended procedure</a>.</p>
+
+        <h2 id="prerequisites">Prerequisites</h2>
+
+        <ul><li>Access to the intended Docker host and MongoDB container, plus permission to execute commands there.</li><li>A readable backup and enough free space for the copied archive, restored data, and rebuilt indexes. Keep the original backup unchanged.</li><li>MongoDB Database Tools where you run the restore; <code>mongosh</code> for verification. Do not assume the container image includes either.</li><li>Credentials authorized to restore the intended namespaces. A valid login does not automatically grant restore privileges.</li><li>A compatible source/target MongoDB version and Database Tools version. Check MongoDB’s compatibility guidance before restoring across versions.</li><li>A reviewed target and scope. Prefer an isolated test instance first. Coordinate application writes and take a recovery backup before changing an existing database.</li></ul>
+
+        <p>These examples assume a local standalone endpoint on port 27017 without TLS. Adapt connection and TLS options to the target deployment; do not disable authentication or certificate verification to make a restore work. See the <a href="https://www.mongodb.com/docs/database-tools/mongorestore/">mongorestore reference</a> for compatibility and required-access details.</p>
+
+        <h2 id="container">Identify the MongoDB Docker Container</h2>
+
+        <pre tabindex="0" aria-label="Host: identify the container and inspect its tools"><code class="language-bash">docker ps
+docker exec '&lt;mongo-container&gt;' mongorestore --version
+docker exec '&lt;mongo-container&gt;' mongosh --version</code></pre>
+
+        <p>Use the intended container’s name or ID from the local output. Keep those identifiers out of shared notes. Docker access is separate from MongoDB authentication.</p>
+
+        <h2 id="copy">Copy the Backup into the Container</h2>
+
+        <pre tabindex="0" aria-label="Host: copy the sample archive into the container"><code class="language-bash">docker cp mongobackup-2025-11-03-1152.gz '&lt;mongo-container&gt;:/tmp/'</code></pre>
+
+        <pre tabindex="0" aria-label="Host: open an interactive container shell"><code class="language-bash">docker exec -it '&lt;mongo-container&gt;' bash</code></pre>
+
+        <p>If bash is unavailable, use the image’s shell:</p>
+
+        <pre tabindex="0" aria-label="Host: use sh instead"><code class="language-bash">docker exec -it '&lt;mongo-container&gt;' sh</code></pre>
+
+        <p>The restore process must be able to read the copied file. From here, the following container commands connect to <code>localhost:27017</code>, which normally reaches MongoDB in that same container. A different container has a different localhost; a separate tools container needs an explicitly configured network target.</p>
+
+        <h2 id="no-auth">Restore Without Authentication</h2>
+
+        <pre tabindex="0" aria-label="Container: restore to a server with authentication disabled"><code class="language-bash">mongorestore \
+  --gzip \
+  --archive=/tmp/mongobackup-2025-11-03-1152.gz</code></pre>
+
+        <p>Use this only when the intended server already runs without authentication. Do not turn authentication off to bypass an error. With no namespace filter, the restore can process all namespaces stored in the archive. It is not limited to one application database.</p>
+
+        <h2 id="authenticated">Restore When MongoDB Authentication Is Enabled</h2>
+
+        <p><strong>Recommended interactive form:</strong> supply the username and authentication database, but omit the password so the tool prompts for it. Run from an interactive terminal.</p>
+
+        <pre tabindex="0" aria-label="Container: restore with a password prompt"><code class="language-bash">mongorestore \
+  --gzip \
+  --archive=/tmp/mongobackup-2025-11-03-1152.gz \
+  --username '&lt;mongo-user&gt;' \
+  --authenticationDatabase admin</code></pre>
+
+        <p>The explicit-password equivalent is shown below for syntax reference. Replacing the placeholder with a real password can expose it through shell history or process arguments; prefer the prompt above.</p>
+
+        <pre tabindex="0" aria-label="Container: explicit password syntax using placeholders"><code class="language-bash">mongorestore \
+  --gzip \
+  --archive=/tmp/mongobackup-2025-11-03-1152.gz \
+  --username '&lt;mongo-user&gt;' \
+  --password '&lt;mongo-password&gt;' \
+  --authenticationDatabase admin</code></pre>
+
+        <p>URI-based equivalent:</p>
+
+        <pre tabindex="0" aria-label="Container: URI syntax using placeholders"><code class="language-bash">mongorestore \
+  --gzip \
+  --archive=/tmp/mongobackup-2025-11-03-1152.gz \
+  --uri='mongodb://&lt;mongo-user&gt;:&lt;mongo-password&gt;@localhost:27017/?authSource=admin' </code></pre>
+
+        <p>Percent-encode reserved characters in URI usernames and passwords; shell quoting does not perform URI encoding. To use a URI with a prompt, omit the password portion:</p>
+
+        <pre tabindex="0" aria-label="Container: URI with a password prompt"><code class="language-bash">mongorestore \
+  --gzip \
+  --archive=/tmp/mongobackup-2025-11-03-1152.gz \
+  --uri='mongodb://&lt;mongo-user&gt;@localhost:27017/?authSource=admin' </code></pre>
+
+        <ul><li><code>--gzip</code>: decompress the gzip-compressed dump input.</li><li><code>--archive</code>: read the single Database Tools archive file, rather than a directory of BSON files.</li><li><code>--username</code>: identify the MongoDB user used for the restore.</li><li><code>--password</code>: provide the user’s password; omitting it with a username allows an interactive prompt.</li><li><code>--authenticationDatabase admin</code>: look up the user in <code>admin</code>. Use the database where the user was actually created.</li><li><code>authSource=admin</code>: URI equivalent of the authentication-database setting; it does not select the database being restored.</li></ul>
+
+        <p>The archive determines destination namespaces unless filters or remapping options change them. For one database, add a quoted namespace filter to the restore command:</p>
+
+        <pre tabindex="0" aria-label="Restore only one database from the archive"><code class="language-bash">mongorestore \
+  --gzip \
+  --archive=/tmp/mongobackup-2025-11-03-1152.gz \
+  --username '&lt;mongo-user&gt;' \
+  --authenticationDatabase admin \
+  --nsInclude='&lt;database-name&gt;.*' </code></pre>
+
+        <p>MongoDB’s <a href="https://www.mongodb.com/docs/database-tools/mongorestore/mongorestore-examples/">restore examples</a> cover compressed archives and interactive credential handling.</p>
+
+        <h2 id="auth-error">Understanding the Authentication Error</h2>
+
+        <pre tabindex="0" aria-label="Example error from an unauthenticated restore"><code class="language-text">Failed: error getting auth version of server: (Unauthorized) Command getParameter requires authentication
+0 document(s) restored successfully. 0 document(s) failed to restore.</code></pre>
+
+        <p>The tool reached MongoDB, but the connection was not authenticated sufficiently to execute the required command. This is not a Docker copy failure or a gzip decoding error. Retry with the correct user, password, and authentication database. If authentication succeeds but later operations are denied, check the user’s restore privileges for the requested scope.</p>
+
+        <p>“0 failed” does not make this run successful: it failed before document restoration began. Read the preceding error and check the process exit status immediately after the command:</p>
+
+        <pre tabindex="0" aria-label="Check the previous command exit status"><code class="language-bash">echo $?</code></pre>
+
+        <h2 id="host">Restore Directly from the Docker Host</h2>
+
+        <p>Copying is optional if Database Tools are installed on the host and the container’s MongoDB port is published. Check the mapping:</p>
+
+        <pre tabindex="0" aria-label="Host: check the published port"><code class="language-bash">docker port '&lt;mongo-container&gt;' 27017/tcp</code></pre>
+
+        <p>The next command assumes container port 27017 maps to host port 27017. Adjust the URI if the host port differs. Here localhost means the Docker host, not the container. An image’s <code>EXPOSE</code> metadata alone does not publish a port.</p>
+
+        <pre tabindex="0" aria-label="Host: restore the local archive with a password prompt"><code class="language-bash">mongorestore \
+  --gzip \
+  --archive=./mongobackup-2025-11-03-1152.gz \
+  --uri='mongodb://&lt;mongo-user&gt;@localhost:27017/?authSource=admin' </code></pre>
+
+        <p>The requested explicit-password URI form is equivalent, with the same history/process-exposure caveat:</p>
+
+        <pre tabindex="0" aria-label="Host: explicit URI credential syntax"><code class="language-bash">mongorestore \
+  --gzip \
+  --archive=./mongobackup-2025-11-03-1152.gz \
+  --uri='mongodb://&lt;mongo-user&gt;:&lt;mongo-password&gt;@localhost:27017/?authSource=admin' </code></pre>
+
+        <p>If no port is published, use the in-container workflow or a reviewed local-only mapping. Do not expose MongoDB publicly just to restore a backup. When Docker targets a remote engine, the local workstation’s localhost is not that remote Docker host.</p>
+
+        <h2 id="verify">Verify the Restore</h2>
+
+        <p>Read the restore output for restored namespaces, document failures, and index errors. A restore is not atomic: a failed run can leave partially restored data. Do not blindly rerun it against an existing target.</p>
+
+        <pre tabindex="0" aria-label="Container: connect to verify, prompting for the password"><code class="language-bash">mongosh \
+  --username '&lt;mongo-user&gt;' \
+  --authenticationDatabase admin</code></pre>
+
+        <p>Explicit-password syntax, if needed:</p>
+
+        <pre tabindex="0" aria-label="Container: mongosh credential syntax"><code class="language-bash">mongosh \
+  --username '&lt;mongo-user&gt;' \
+  --password '&lt;mongo-password&gt;' \
+  --authenticationDatabase admin</code></pre>
+
+        <p>At the mongosh prompt, replace placeholders and inspect the intended database:</p>
+
+        <pre tabindex="0" aria-label="mongosh: inspect databases and collections"><code class="language-javascript">show dbs
+use &lt;database-name&gt;
+show collections
+db.getCollection('&lt;collection-name&gt;').countDocuments({})
+db.getCollection('&lt;collection-name&gt;').getIndexes()</code></pre>
+
+        <p>Compare collection names, expected counts, indexes, and selected application records with backup expectations. Counts alone do not establish completeness. Use a verification account with read access if the restore account cannot query data; database visibility also depends on permissions. The <a href="https://www.mongodb.com/docs/mongodb-shell/connect/">mongosh connection guide</a> documents password prompting.</p>
+
+        <h2 id="formats">Archive vs Directory-Based MongoDB Backups</h2>
+
+        <p>A <code>.gz</code> suffix proves neither gzip integrity nor MongoDB archive format. A Database Tools archive is not a tar archive and is not an exported JSON file. Identify how the backup was created before choosing a restore command.</p>
+
+        <pre tabindex="0" aria-label="Host: test the gzip stream without restoring"><code class="language-bash">gzip -t mongobackup-2025-11-03-1152.gz</code></pre>
+
+        <p>Passing this check validates the gzip stream only. It does not prove the payload is a valid MongoDB archive.</p>
+
+        <pre tabindex="0" aria-label="Directory dump: creation and matching restore syntax"><code class="language-bash"># Format examples; add the required connection/authentication flags
+mongodump --out=./dump
+mongorestore ./dump
+
+# A directory containing compressed BSON/metadata files
+mongodump --gzip --out=./dump-gzip
+mongorestore --gzip ./dump-gzip</code></pre>
+
+        <p>Directory dumps contain database subdirectories and BSON/metadata files. Pass the directory path instead of <code>--archive</code>. For an uncompressed Database Tools archive, use <code>--archive</code> without <code>--gzip</code>. If the backup is a tarball of a dump directory, extract that wrapper first, then restore the directory. Do not point <code>--archive</code> at the tarball.</p>
+
+        <h2 id="troubleshooting">Troubleshooting</h2>
+
+        <ul><li><strong>mongorestore: command not found:</strong> install compatible MongoDB Database Tools where the command will run, or use the host workflow. Having the server or mongosh installed does not guarantee the tools are present.</li><li><strong>Unauthorized / getParameter requires authentication:</strong> the server was reached; supply credentials and verify the authentication database. Do not disable authentication.</li><li><strong>Incorrect authentication database:</strong> <code>admin</code> is correct only if that is where this user exists. It is independent of the database in the backup.</li><li><strong>Wrong username/password:</strong> validate the same login with mongosh. Check accidental whitespace and URI encoding; use a prompt to avoid shell interpolation. If login works but restore is denied, investigate authorization.</li><li><strong>Connection refused or timeout from the host:</strong> inspect the published port, host-port number, MongoDB bind settings, container status, and firewall. Run inside the container if host publication is unavailable.</li><li><strong>Archive header or gzip errors:</strong> confirm the backup creation command, check for truncation, and distinguish archive, compressed directory, and tarball formats. Renaming a file does not convert it.</li><li><strong>Duplicate key errors or existing collections:</strong> mongorestore inserts documents rather than updating matching records. Existing documents may conflict; non-conflicting inserts can already have succeeded. Use a clean target or a deliberately reviewed replacement strategy.</li><li><strong>Missing collections after a reported success:</strong> review namespace filters, archive contents as reported in restore output, destination database, and verification privileges. Confirm indexes and counts, not just the final document total.</li></ul>
+
+        <h3>When --drop is appropriate</h3>
+
+        <p><strong>Destructive operation:</strong> <code>--drop</code> removes target collections that are being restored before loading their backup versions. Current documents in those collections are lost, and a later failure can leave an incomplete restore. It does not remove unrelated collections absent from the backup. Use it only for an intentional replacement with a verified recovery backup, reviewed namespace scope, and coordinated application writes. Do not use it casually against production.</p>
+
+        <p>If restoring <code>admin</code> with <code>--drop</code>, credentials can also be replaced by those in the backup, potentially affecting access. Review MongoDB’s <a href="https://www.mongodb.com/docs/database-tools/mongorestore/">drop and access-control documentation</a> before such a restore. The example below must be restricted to the intended application database, not <code>admin</code>.</p>
+
+        <pre tabindex="0" aria-label="Destructive: replace only the reviewed application database collections"><code class="language-bash">mongorestore \
+  --gzip \
+  --archive=/tmp/mongobackup-2025-11-03-1152.gz \
+  --username '&lt;mongo-user&gt;' \
+  --authenticationDatabase admin \
+  --nsInclude='&lt;database-name&gt;.*' \
+  --drop</code></pre>
+
+        <h2 id="reference">Useful Command Reference</h2>
+
+        <pre tabindex="0" aria-label="Host: locate, copy, and enter"><code class="language-bash">docker ps
+docker cp mongobackup-2025-11-03-1152.gz '&lt;mongo-container&gt;:/tmp/'
+docker exec -it '&lt;mongo-container&gt;' bash</code></pre>
+
+        <pre tabindex="0" aria-label="Container: restore with prompt and stop on the first document error"><code class="language-bash">mongorestore \
+  --gzip \
+  --archive=/tmp/mongobackup-2025-11-03-1152.gz \
+  --username '&lt;mongo-user&gt;' \
+  --authenticationDatabase admin \
+  --nsInclude='&lt;database-name&gt;.*' \
+  --stopOnError</code></pre>
+
+        <p><code>--stopOnError</code> stops on document insertion errors such as duplicate keys; it does not roll back earlier writes. Remove the namespace filter only when restoring all archive namespaces is intentional.</p>
+
+        <pre tabindex="0" aria-label="Container: verify with a password prompt"><code class="language-bash">mongosh \
+  --username '&lt;mongo-user&gt;' \
+  --authenticationDatabase admin</code></pre>
+
+        <pre tabindex="0" aria-label="mongosh: quick verification"><code class="language-javascript">show dbs
+use &lt;database-name&gt;
+show collections</code></pre>
+
+        <h2 id="procedure">Final Recommended Procedure</h2>
+
+        <ol><li>Confirm backup format, tool compatibility, target instance, and namespace scope; keep the original backup.</li><li>Test the restore on an isolated compatible target first. Prepare a recovery backup and coordinate writes before touching an existing target.</li><li>Choose either the copy-and-exec path or the host path; verify the endpoint from that execution context.</li><li>Authenticate using a password prompt and the user’s actual authentication database. Check restore permissions.</li><li>Restore with the intended namespace filter and stop-on-error behavior. Use --drop only after explicitly reviewing the replacement consequences.</li><li>Check the exit status and full restore output. Verify databases, collections, counts, indexes, and application behavior before returning the target to service.</li><li>Remove the temporary container copy once verification is complete, following backup-retention policy; retain the original backup and a sanitized record of the result.</li></ol>
+      </div>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>Senior DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="../../index.html#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="../../index.html#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <a class="article-next" href="archiving-and-compressing-directories-in-linux.html"><span><small>Next field note</small><strong>Archiving and Compressing Directories in Linux with tar, gzip, and zip</strong></span><span aria-hidden="true">→</span></a>
+    </article>
+  </main>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="../../index.html">Home</a><a href="../index.html">Writing</a><a href="../../index.html#contact">Contact</a></div></footer>
+</body>
+</html>
