@@ -5,8 +5,16 @@
     <link>https://hossein.cloud/blog/</link>
     <description>Practical notes on infrastructure, DevOps, LLM operations, and RAG systems.</description>
     <language>en</language>
-    <lastBuildDate>Tue, 06 Oct 2026 06:55:18 GMT</lastBuildDate>
+    <lastBuildDate>Tue, 06 Oct 2026 07:10:01 GMT</lastBuildDate>
     <atom:link href="https://hossein.cloud/feed.xml" rel="self" type="application/rss+xml" />
+    <item>
+      <title>Stock Options in the Iranian Market: A Practical Knowledge Base</title>
+      <link>https://hossein.cloud/blog/posts/stock-options-in-the-iranian-market.html</link>
+      <guid isPermaLink="true">https://hossein.cloud/blog/posts/stock-options-in-the-iranian-market.html</guid>
+      <pubDate>Tue, 06 Oct 2026 07:10:01 GMT</pubDate>
+      <description>An options reference with verified arithmetic, rial/toman checks, conditional payoff scenarios, and exercise-funding calculations.</description>
+      <category>Markets</category>
+    </item>
     <item>
       <title>Restoring a Gzip-Compressed MongoDB Backup in Docker</title>
       <link>https://hossein.cloud/blog/posts/restoring-a-gzip-mongodb-backup-in-docker.html</link>

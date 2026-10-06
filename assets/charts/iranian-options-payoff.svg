@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 820 500" role="img" aria-labelledby="title desc"><title id="title">Long-call expiry profit and loss, conditional strike</title><desc id="desc">354 contracts of 4,407 shares; premium 64 IRR; assumed strike 590 toman. Break-even 596.4 toman; at 650 toman profit is 83,620,180.8 toman before fees.</desc>
+<style>text{font-family:system-ui,sans-serif;fill:#344355;font-size:15px}.small{font-size:13px}.heading{font-size:20px;font-weight:700;fill:#102c3a}.grid{stroke:#d5ddd9;stroke-width:1}.curve{fill:none;stroke:#146b68;stroke-width:3}</style>
+<rect width="820" height="500" rx="10" fill="#f5f4ee"/>
+<rect x="80" y="100" width="306.0" height="290" fill="#f4e3df"/><rect x="407.75999999999993" y="100" width="352.24000000000007" height="290" fill="#e0eeea"/>
+<text x="30" y="33" class="heading" text-anchor="start">Expiration P/L · 354 contracts</text>
+<text x="30" y="61" class="small" text-anchor="start">Conditional: strike 590 toman · premium 6.4 toman/share</text>
+<line x1="80" y1="359.4736842105263" x2="760" y2="359.4736842105263" class="grid"/>
+<text x="68" y="364.4736842105263" class="small" text-anchor="end">0</text>
+<line x1="80" y1="298.42105263157896" x2="760" y2="298.42105263157896" class="grid"/>
+<text x="68" y="303.42105263157896" class="small" text-anchor="end">40</text>
+<line x1="80" y1="237.3684210526316" x2="760" y2="237.3684210526316" class="grid"/>
+<text x="68" y="242.3684210526316" class="small" text-anchor="end">80</text>
+<line x1="80" y1="176.31578947368422" x2="760" y2="176.31578947368422" class="grid"/>
+<text x="68" y="181.31578947368422" class="small" text-anchor="end">120</text>
+<line x1="80" y1="115.26315789473688" x2="760" y2="115.26315789473688" class="grid"/>
+<text x="68" y="120.26315789473688" class="small" text-anchor="end">160</text>
+<text x="80.0" y="420" class="" text-anchor="middle">500</text>
+<text x="250.0" y="420" class="" text-anchor="middle">550</text>
+<text x="420.0" y="420" class="" text-anchor="middle">600</text>
+<text x="590.0" y="420" class="" text-anchor="middle">650</text>
+<text x="760.0" y="420" class="" text-anchor="middle">700</text>
+<line x1="80" y1="359.4736842105263" x2="760" y2="359.4736842105263" stroke="#82908d"/>
+<polyline points="80.0,374.7131829894737 386.0,374.7131829894737 760.0,112.7842977263158" class="curve"/>
+<line x1="386.0" y1="100" x2="386.0" y2="390" stroke="#9b713d" stroke-dasharray="5 5"/>
+<line x1="407.75999999999993" y1="100" x2="407.75999999999993" y2="390" stroke="#9b713d" stroke-dasharray="5 5"/>
+<text x="100" y="123" class="small" text-anchor="start">OTM · S &lt; 590</text>
+<text x="580" y="123" class="small" text-anchor="start">Profit · S &gt; 596.4</text>
+<text x="378.0" y="85" class="small" text-anchor="end">Strike 590</text>
+<text x="415.75999999999993" y="85" class="small" text-anchor="start">Break-even 596.4</text>
+<text x="100" y="401.7131829894737" class="small" text-anchor="start">Maximum loss: 9.9844992 million toman</text>
+<circle cx="590.0" cy="231.8428819368421" r="6" fill="#9b713d"/>
+<text x="580.0" y="209.8428819368421" class="small" text-anchor="end">650 → +83.6201808m toman</text>
+<text x="80" y="465" class="small" text-anchor="start">X: underlying at expiration (toman/share) · Y: total P/L (million toman)</text>
+<text x="80" y="487" class="small" text-anchor="start">ITM starts above 590; ITM does not necessarily mean a net profit. Fees excluded.</text>
+</svg>

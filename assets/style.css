@@ -469,6 +469,9 @@ a:focus-visible {
 .article-body .reference-table th { background: var(--tint); color: var(--ink); }
 .article-body .reference-table tr:last-child td { border-bottom: 0; }
 .article-body .reference-table code { white-space: nowrap; }
+.article-body .options-figure { margin: 28px 0; max-width: 100%; overflow-x: auto; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); }
+.article-body .options-figure img { display: block; width: 100%; min-width: 640px; height: auto; }
+.article-body .options-figure figcaption { padding: 14px 18px; font-size: 14px; line-height: 1.7; color: var(--muted); }
 .article-body blockquote { margin: 28px 0; padding-block: 15px; padding-inline-start: 23px; color: var(--ink); border-inline-start: 3px solid var(--brass); }
 .article-byline { margin-top: 18px; color: var(--accent-strong); font: 600 12px/1.7 var(--mono); }
 .article-author { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding-top: 24px; margin-top: 49px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }

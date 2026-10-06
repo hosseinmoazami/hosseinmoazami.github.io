@@ -1,0 +1,20 @@
+{
+  "source": "User-supplied historical example; contract specifications and market rows not independently authenticated",
+  "symbol": "ضجار2054",
+  "identifier": "BTEJ-O-14040217",
+  "underlying": "Bank Tejarat (وتجارت)",
+  "contracts": 354,
+  "multiplier": 4407,
+  "entry_premium_irr": 64,
+  "reported_strike": 590,
+  "strike_unit_status": "Unverified; scenario assumes toman because supplied spot discussion labels 546–562 as toman",
+  "scenario_strike_irr": 5900,
+  "irr_per_toman": 10,
+  "reported_paid_toman": 10000000,
+  "scenario_spots_toman": [500, 550, 562, 590, 596.4, 600, 620, 650, 700],
+  "history": [
+    {"date": "2025-04-12", "open": 8, "high": 19, "low": 11, "close": 16, "last": 16, "volume": 10353},
+    {"date": "2025-04-13", "open": 16, "high": 82, "low": 45, "close": 64, "last": 80, "volume": 44828},
+    {"date": "2025-04-14", "open": 64, "high": 90, "low": 51, "close": 70, "last": 66, "volume": 41077}
+  ]
+}

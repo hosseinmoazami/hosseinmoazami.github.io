@@ -1,0 +1,258 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="An options reference with verified arithmetic, rial/toman checks, conditional payoff scenarios, and exercise-funding calculations.">
+  <meta name="author" content="Hossein Moazami">
+  <meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/blog/posts/stock-options-in-the-iranian-market.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Stock Options in the Iranian Market: A Practical Knowledge Base — Hossein Moazami">
+  <meta property="og:description" content="An options reference with verified arithmetic, rial/toman checks, conditional payoff scenarios, and exercise-funding calculations.">
+  <meta property="og:url" content="https://hossein.cloud/blog/posts/stock-options-in-the-iranian-market.html">
+  <meta property="og:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <meta property="article:published_time" content="2026-10-06">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Stock Options in the Iranian Market: A Practical Knowledge Base — Hossein Moazami">
+  <meta name="twitter:description" content="An options reference with verified arithmetic, rial/toman checks, conditional payoff scenarios, and exercise-funding calculations.">
+  <meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta name="twitter:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <title>Stock Options in the Iranian Market: A Practical Knowledge Base — Hossein Moazami</title>
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32">
+  <link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml">
+  <link rel="stylesheet" href="../../assets/style.css?v=20260930-4">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Stock Options in the Iranian Market: A Practical Knowledge Base","datePublished":"2026-10-06","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/stock-options-in-the-iranian-market.html","image":"https://hossein.cloud/assets/og-card.png","description":"An options reference with verified arithmetic, rial/toman checks, conditional payoff scenarios, and exercise-funding calculations."}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="../../index.html" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a>
+    <nav class="nav" aria-label="Main navigation"><a href="../../index.html#work">Work</a><a href="../../index.html#experience">Experience</a><a href="../index.html" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="../../index.html#contact">Contact</a></nav>
+  </header>
+  <main id="main" class="article-shell">
+    <a class="back-link" href="../index.html"><span aria-hidden="true">←</span> All field notes</a>
+    <article>
+      <header class="article-header"><div class="post-meta"><span class="post-tag">Markets</span><time datetime="2026-10-06">October 6, 2026</time><span aria-hidden="true">/</span><span>15 min read</span></div><h1>Stock Options in the Iranian Market: A Practical Knowledge Base</h1><p class="article-lead">An options reference with verified arithmetic, rial/toman checks, conditional payoff scenarios, and exercise-funding calculations.</p><p class="article-byline">By Hossein Moazami · Senior DevOps &amp; Platform Engineer</p></header>
+      <div class="article-body">
+        <p><strong>Unit convention throughout this historical example: 1 toman = 10 IRR.</strong> Entry premium is 64 IRR per underlying share, or 6.4 toman. Never add a rial premium to a toman strike without converting first.</p>
+
+        <blockquote><p><strong>Unresolved contract input:</strong> the supplied strike is “590” with conflicting unit labels. The premium reconciles to approximately 10 million toman, but that does not establish the strike unit. Calculations below show both interpretations; the main scenario chart conditionally assumes <strong>590 toman = 5,900 IRR</strong>. The contract specification has not been independently verified.</p></blockquote>
+
+        <p>This reference reconstructs a supplied historical trade example; it does not authenticate an execution record. Options are leveraged derivatives: buyers can lose the entire premium, while writers can face materially different and potentially much larger losses. This is educational material, not personalized financial advice.</p>
+
+        <p>Jump to: <a href="#units">Unit reconciliation</a> · <a href="#break-even">Break-even</a> · <a href="#funding">Exercise cash</a> · <a href="#scenarios">Scenarios</a> · <a href="#exit">Sell or exercise</a> · <a href="#history">Historical data issues</a> · <a href="#cheat-sheet">Cheat sheet</a>.</p>
+
+        <h2 id="contract">1. What an Option Contract Is</h2>
+
+        <div class="reference-table" role="region" aria-label="Option terminology" tabindex="0"><table><thead><tr><th scope="col">Term</th><th scope="col">Meaning</th></tr></thead><tbody><tr><td>Call / put</td><td>A call gives the holder a right to buy; a put gives a right to sell the specified underlying quantity at the strike, subject to the contract’s exercise terms.</td></tr><tr><td>Buyer / writer</td><td>The buyer pays for a right. A writer opens a short position and accepts the corresponding obligation if assigned. Selling an existing long position to close it is different from writing a new option.</td></tr><tr><td>Premium / strike</td><td>Premium is the option price paid up front; strike is the per-share transaction price on exercise. Both require an explicit currency unit.</td></tr><tr><td>Expiration / multiplier</td><td>Expiration limits the contract’s life. The multiplier specifies shares per contract and can be adjusted; it is not universally 1,000.</td></tr><tr><td>Exercise / physical settlement</td><td>Exercise invokes the contract. Physical settlement transfers shares and cash; a cash-settled contract instead settles the prescribed difference under its rules.</td></tr><tr><td>Intrinsic / time value</td><td>Call intrinsic value is max(0, spot − strike); put intrinsic value is max(0, strike − spot). The excess of an option quote over intrinsic value is commonly called time or extrinsic value.</td></tr></tbody></table></div>
+
+        <pre tabindex="0" aria-label="Anatomy of the supplied contract"><code>Bank Tejarat shares (وتجارت)
+  -&gt; Call contract (ضجار2054)
+     -&gt; Multiplier: 4,407 shares per contract (supplied)
+     -&gt; Strike: 590 [unit unresolved]
+     -&gt; Entry premium: 64 IRR per share
+     -&gt; Expiration: 17 Ordibehesht [verify year and cutoff]
+     -&gt; Close in market OR exercise/settle under contract rules</code></pre>
+
+        <div class="reference-table" role="region" aria-label="Moneyness of calls and puts" tabindex="0"><table><thead><tr><th scope="col">State</th><th scope="col">Call</th><th scope="col">Put</th></tr></thead><tbody><tr><td>OTM — no intrinsic value</td><td>Spot < strike</td><td>Spot > strike</td></tr><tr><td>ATM — at the strike</td><td>Spot = strike</td><td>Spot = strike</td></tr><tr><td>ITM — positive intrinsic value</td><td>Spot > strike</td><td>Spot < strike</td></tr></tbody></table></div>
+
+        <p>Moneyness ignores the premium paid: an ITM call can still be a losing trade. For general payoff definitions, see the Options Industry Council’s <a href="https://www.optionseducation.org/strategies/all-strategies/long-call">long-call guide</a>. Its educational concepts apply here; US contract sizes and exercise procedures must not be imported into Iranian contracts.</p>
+
+        <h2 id="comparison">2. Spot vs Futures vs Options</h2>
+
+        <div class="reference-table" role="region" aria-label="Cash shares, futures, and options" tabindex="0"><table><thead><tr><th scope="col">Feature</th><th scope="col">Cash stock purchase</th><th scope="col">Futures</th><th scope="col">Long option / option writer</th></tr></thead><tbody><tr><td>Ownership</td><td>Own shares after settlement.</td><td>Contract exposure, not immediate share ownership.</td><td>Long option owns a right; writer owes performance if assigned.</td></tr><tr><td>Obligation</td><td>Pay for the shares purchased.</td><td>Both sides have contractual obligations unless closed.</td><td>Buyer may exercise under terms; writer must meet assignment obligations.</td></tr><tr><td>Capital / margin</td><td>Full purchase cost when unleveraged.</td><td>Initial and variation margin; additional cash may be needed.</td><td>Buyer funds premium; physical exercise needs further cash. Writer collateral/margin depends on rules.</td></tr><tr><td>Leverage</td><td>None for an unleveraged cash purchase.</td><td>Notional can exceed margin deposited.</td><td>Exposure can be large relative to premium or collateral.</td></tr><tr><td>Maximum loss</td><td>Purchase cost for unleveraged long shares, if value reaches zero.</td><td>Can exceed initial margin; depends on position and underlying.</td><td>Buyer: premium plus costs before exercise. Uncovered call writer: theoretically unlimited loss.</td></tr><tr><td>Expiration</td><td>No derivative expiry.</td><td>Contract expires.</td><td>Option expires.</td></tr><tr><td>Risk</td><td>Share-price and issuer risk.</td><td>Price moves, leverage, margin calls, settlement.</td><td>Time decay, volatility, liquidity; writers add assignment and funding risks.</td></tr></tbody></table></div>
+
+        <p>The option buyer’s premium-loss limit describes the option position. After a call is physically exercised, the holder owns shares and faces their subsequent price risk. A short put also carries substantial downside; collateral does not eliminate economic loss.</p>
+
+        <h2 id="iran">3. How Iranian Stock Options Work</h2>
+
+        <p>For a Tehran Stock Exchange or Iran Fara Bourse series, use the exchange contract specification, corporate-action notices, and the broker’s current exercise instructions as the operational source of truth. This article does not claim a verified current commission, settlement window, margin formula, or exercise deadline.</p>
+
+        <ul><li>Confirm multiplier, strike, quote currency, underlying, expiration year, last trading day, and exercise style.</li><li>Confirm physical versus cash settlement, eligibility, submission procedure, cash/share delivery deadlines, fees, taxes, and consequences of failing to act.</li><li>Check corporate-action adjustments to strike and multiplier. Use prices and specifications effective on the same date; do not mix pre-adjustment prices with a post-adjustment multiplier.</li><li>Confirm the trading calendar and broker cutoff separately from the printed expiration date. Do not assume an ITM holding will settle automatically.</li></ul>
+
+        <p>The supplied multiplier of 4,407 is used exactly as given. Its unusual size is a reason to inspect adjustment history, not proof of any particular corporate action. No authoritative contract notice was located to resolve the disputed strike unit.</p>
+
+        <h2 id="symbol">4. Reading an Option Symbol in EasyTrader</h2>
+
+        <p>The supplied identifiers are <bdi lang="fa">ضجار2054</bdi> and <code>BTEJ-O-14040217</code>, with underlying Bank Tejarat (<bdi lang="fa">وتجارت</bdi>). Treat them as lookup keys, not a substitute for the terms. The date-like suffix suggests 1404/02/17, consistent with the supplied “17 Ordibehesht”; the year, exchange date, and broker deadline still need confirmation. This is a historical 2025 example, not a live quote.</p>
+
+        <div class="reference-table" role="region" aria-label="Fields to inspect in the trading platform" tabindex="0"><table><thead><tr><th scope="col">Field</th><th scope="col">What to check</th></tr></thead><tbody><tr><td>Underlying, strike, expiration, multiplier</td><td>Exact series, explicit rial/toman units, effective adjustment date, and settlement terms.</td></tr><tr><td>Best bid / best ask</td><td>Prices and quantities currently available. An immediate sale is evaluated against executable bids, not the last trade.</td></tr><tr><td>Last / closing price</td><td>Last is a recent transaction; closing is the venue’s published session value and can differ. Neither guarantees execution.</td></tr><tr><td>Volume / open interest</td><td>Session trading activity versus outstanding contracts at a point in time; verify timestamp and definition.</td></tr><tr><td>Spread / depth / liquidity</td><td>Price concession and available contracts across multiple order-book levels, especially for a 354-contract exit.</td></tr></tbody></table></div>
+
+        <h2 id="opening">5. Opening a Long Call Position</h2>
+
+        <pre tabindex="0" aria-label="Conceptual order workflow"><code>Search contract -&gt; Inspect specifications and units
+  -&gt; Choose number of contracts -&gt; Enter premium per share
+  -&gt; Review premium x multiplier x quantity + costs
+  -&gt; Submit buy order -&gt; Confirm actual fills
+  -&gt; Monitor position, liquidity, and expiration obligations</code></pre>
+
+        <p>This is a platform-independent workflow, not a claim about current EasyTrader button names. An accepted order is not a fill. Record executed quantity and weighted-average entry premium if fills occur at multiple prices; recompute exposure and cost from executed values.</p>
+
+        <h2 id="formulas">6. Core Calculations</h2>
+
+        <pre tabindex="0" aria-label="Long-call formulas with every price in IRR per share"><code>N = number of contracts        M = shares per contract
+Q = N x M                      P = entry premium (IRR/share)
+K = strike (IRR/share)          S_T = spot at expiration (IRR/share)
+
+Premium cost                 C = P x Q
+Intrinsic value/share        I = max(0, S_T - K)
+Gross intrinsic value        G = I x Q
+Expiry net P/L before costs     = G - C
+Break-even before costs         = K + P
+Additional exercise cash        = K x Q
+Maximum option loss             = C + applicable transaction costs
+Return on premium (%)           = (G - C) / C x 100
+IRR -&gt; toman                    = IRR / 10</code></pre>
+
+        <p>Q is the contractual share quantity, not current share ownership or delta-adjusted exposure. These are expiration formulas, not a pricing model for an option with time remaining. “Gross exercise value” below means the intrinsic spread, not the total market value of delivered shares. Physical settlement does not necessarily pay that spread as cash.</p>
+
+        <h2 id="units">7. Worked Example: 354 Contracts and the Unit Check</h2>
+
+        <pre tabindex="0" aria-label="Reconcile the premium payment"><code>354 contracts x 4,407 shares/contract = 1,560,078 underlying shares
+64 IRR/share x 1,560,078 shares = 99,844,992 IRR
+99,844,992 IRR / 10 = 9,984,499.2 toman
+
+Premium per contract = 282,048 IRR = 28,204.8 toman
+Reported approximate payment = 10,000,000 toman
+Difference = 15,500.8 toman</code></pre>
+
+        <p>The calculated premium is approximately 10 million toman. The small difference can reflect rounding or costs, but no fee amount can be inferred without the execution statement. If the quoted premium were 64 <em>toman</em>, the cost would instead be <strong>99,844,992 toman</strong>—ten times the result and inconsistent with the stated approximate payment.</p>
+
+        <p><strong>This reconciles the premium unit only.</strong> The strike is not part of the premium-cost formula. The payment cannot independently verify the strike unit, underlying-price unit, or multiplier adjustment history.</p>
+
+        <h2 id="break-even">8. Break-Even: Two Different Strike Interpretations</h2>
+
+        <div class="reference-table" role="region" aria-label="Strike-unit ambiguity" tabindex="0"><table><thead><tr><th scope="col">Interpretation</th><th scope="col">Normalized strike</th><th scope="col">Break-even before costs</th></tr></thead><tbody><tr><td>590 means IRR</td><td>590 IRR = 59 toman</td><td>654 IRR = 65.4 toman</td></tr><tr><td>590 means toman — conditional model</td><td>5,900 IRR = 590 toman</td><td>5,964 IRR = 596.4 toman</td></tr></tbody></table></div>
+
+        <p>The supplied spot discussion explicitly labels 546–562 as toman. If those labels are correct, a 590-toman strike describes an OTM call and is internally coherent with the discussion. A 590-IRR strike alongside a 546-toman spot would imply 487 toman of intrinsic value per share against a 6.4-toman entry premium—a major inconsistency requiring investigation. This is evidence of mismatched inputs, not a verified arbitrage or proof of the true strike.</p>
+
+        <p>If the spot figures were themselves actually IRR, then a 590-IRR strike could also be coherent. Therefore the rest of the article uses <strong>the explicit conditional assumption K = 590 toman</strong>, not a verified contract fact. Do not use its funding amounts or scenario returns for an order until the official terms and units agree.</p>
+
+        <figure class="options-figure"><a href="../../assets/charts/iranian-options-payoff.svg" aria-label="Open full-size chart: Conditional long-call expiration payoff in million toman"><img src="../../assets/charts/iranian-options-payoff.svg" alt="Conditional long-call expiration payoff in million toman" loading="lazy"></a><figcaption>Calculated from 354 × 4,407 shares and a 64-IRR premium. Strike 590 toman is assumed, not verified. Full-size view opens on selection; exact values follow in the scenario table.</figcaption></figure>
+
+        <p>Below or at 590 toman the full premium is lost at expiration. Between 590 and 596.4 toman the call is ITM but still loses money after premium. Above 596.4 toman it makes a before-fee profit, assuming its intrinsic value is successfully realized. Costs raise the effective break-even.</p>
+
+        <h2 id="funding">9. Exercise and Physical Settlement Funding</h2>
+
+        <div class="reference-table" role="region" aria-label="Funding under the conditional 590-toman strike" tabindex="0"><table><thead><tr><th scope="col">Amount</th><th scope="col">IRR</th><th scope="col">Toman</th></tr></thead><tbody><tr><td>New exercise cash per contract</td><td>26,001,300</td><td>2,600,130</td></tr><tr><td>New exercise cash for all 354</td><td>9,204,460,200</td><td>920,446,020</td></tr><tr><td>Original premium already paid</td><td>99,844,992</td><td>9,984,499.2</td></tr><tr><td>Total acquisition cost including premium, before fees</td><td>9,304,305,192</td><td>930,430,519.2</td></tr></tbody></table></div>
+
+        <p>The buyer needs <strong>920,446,020 toman of additional exercise cash</strong>; the 9,984,499.2-toman premium is already spent and does not fund that payment. Total effective acquisition cost is 596.4 toman per share before fees. If the strike were instead 590 IRR, additional exercise cash would be 92,044,602 toman. That is another tenfold difference in the funding requirement.</p>
+
+        <h2 id="scenarios">10. Scenario Analysis at Expiration</h2>
+
+        <p><strong>Conditional strike: 590 toman. All monetary columns below are in toman</strong>; intrinsic is per share and the other monetary columns cover all 354 contracts. Original premium is fixed at 9,984,499.2 toman. Returns use this exact premium, not the rounded 10-million figure. Fees, taxes, financing, slippage, and settlement failure are excluded.</p>
+
+        <div class="reference-table" role="region" aria-label="Conditional expiration scenarios in toman" tabindex="0"><table><thead><tr><th scope="col">Spot at expiration</th><th scope="col">Intrinsic / share</th><th scope="col">Gross exercise value</th><th scope="col">Original premium</th><th scope="col">Net P/L</th><th scope="col">Return on premium</th><th scope="col">Exercise economic?</th></tr></thead><tbody><tr><td>500</td><td>0</td><td>0</td><td>9,984,499.2</td><td>-9,984,499.2</td><td>-100%</td><td>No (OTM)</td></tr><tr><td>550</td><td>0</td><td>0</td><td>9,984,499.2</td><td>-9,984,499.2</td><td>-100%</td><td>No (OTM)</td></tr><tr><td>562</td><td>0</td><td>0</td><td>9,984,499.2</td><td>-9,984,499.2</td><td>-100%</td><td>No (OTM)</td></tr><tr><td>590</td><td>0</td><td>0</td><td>9,984,499.2</td><td>-9,984,499.2</td><td>-100%</td><td>No intrinsic benefit (ATM)</td></tr><tr><td>596.4</td><td>6.4</td><td>9,984,499.2</td><td>9,984,499.2</td><td>0</td><td>0%</td><td>Yes: positive intrinsic</td></tr><tr><td>600</td><td>10</td><td>15,600,780</td><td>9,984,499.2</td><td>5,616,280.8</td><td>56.25%</td><td>Yes: positive intrinsic</td></tr><tr><td>620</td><td>30</td><td>46,802,340</td><td>9,984,499.2</td><td>36,817,840.8</td><td>368.75%</td><td>Yes: positive intrinsic</td></tr><tr><td>650</td><td>60</td><td>93,604,680</td><td>9,984,499.2</td><td>83,620,180.8</td><td>837.5%</td><td>Yes: positive intrinsic</td></tr><tr><td>700</td><td>110</td><td>171,608,580</td><td>9,984,499.2</td><td>161,624,080.8</td><td>1,618.75%</td><td>Yes: positive intrinsic</td></tr></tbody></table></div>
+
+        <p>“Yes” asks whether exercise captures positive intrinsic value if available under the contract, ignoring costs and constraints. It is not an instruction to exercise rather than close. Premium is a sunk cost for that decision: exercise can preserve some value even when the overall trade is below break-even.</p>
+
+        <h2 id="650">11. The 650-Toman Scenario, Recalculated</h2>
+
+        <pre tabindex="0" aria-label="Exact 650-toman scenario, conditional on a 590-toman strike"><code>Spot at expiry           = 650 toman = 6,500 IRR/share
+Strike                   = 590 toman = 5,900 IRR/share
+Intrinsic                = 60 toman = 600 IRR/share
+Entry premium            = 6.4 toman = 64 IRR/share
+Profit after premium     = 53.6 toman = 536 IRR/share
+Profit per contract      = 236,215.2 toman = 2,362,152 IRR
+Gross intrinsic, all     = 93,604,680 toman = 936,046,800 IRR
+Original premium, all    = 9,984,499.2 toman = 99,844,992 IRR
+Net profit, all          = 83,620,180.8 toman = 836,201,808 IRR
+Return on exact premium  = 837.5% before fees</code></pre>
+
+        <p>At 650 toman, the delivered shares have a market value of 1,014,050,700 toman. Subtract 920,446,020 toman of exercise cash and 9,984,499.2 toman of premium to obtain 83,620,180.8 toman. If the shares are retained, that figure is a mark-to-market economic gain at the assumed spot, not a realized cash profit. Selling all shares at that price is not guaranteed.</p>
+
+        <ul><li><strong>Exercise and acquire shares:</strong> fund the strike payment, follow the valid exercise process, and take on stock ownership risk after delivery.</li><li><strong>Sell to close before expiration:</strong> realized P/L is (actual sale premium − 64 IRR) × shares represented by the contracts closed, less costs. Market price may include time value and execution may occur across multiple bids.</li><li><strong>Hold ITM through expiration:</strong> value depends on correctly meeting the exercise/settlement rules. ITM status is not a guarantee of automatic payment or successful settlement.</li></ul>
+
+        <p>The 837.5% figure is return on premium for the conditional expiration model, not an annualized return, probability estimate, or return on all capital needed to acquire the shares.</p>
+
+        <h2 id="exit">12. Sell the Option or Exercise It?</h2>
+
+        <p>Compare the executable option bid with intrinsic value, remaining time value, fees, share-market liquidity, and the funding requirement. Use the bid available for the intended quantity, not a stale last price. Exercise is only available when the contract permits it; European-style exercise terms, where applicable, do not allow an early exercise simply because it looks attractive.</p>
+
+        <pre tabindex="0" aria-label="Decision framework, subject to the contract’s exercise window"><code>Before the trading/exercise cutoff
+  |
+  +-- Verify specifications, units, deadline, and executable bids
+  |
+  +-- OTM or ATM?
+  |     -&gt; Before expiry: option may still have saleable time value
+  |     -&gt; At expiry: no intrinsic exercise benefit; check instructions
+  |
+  +-- ITM?
+        -&gt; Net sale proceeds vs net exercise-and-share-sale proceeds
+        -&gt; Bid above intrinsic? Closing may preserve time value
+        -&gt; Weak bids? Check depth, costs, and actual exercise eligibility
+        -&gt; Want shares AND can fund settlement? Evaluate exercise
+        -&gt; Cannot fund or meet cutoff? Plan a feasible exit in time
+
+Do not let an ITM position lapse merely because action was missed.</code></pre>
+
+        <p>Closing may suit a holder who can capture meaningful time value, has sufficient bids and a reasonable spread, and does not want to fund physical delivery. Exercise may be relevant near expiration when permitted, little time value remains, the holder wants shares, funds are available, and settlement costs have been checked. Neither is universally preferable.</p>
+
+        <p>Time value is often estimated as option market price minus current intrinsic value. Positive remaining time value can be sacrificed by exercise instead of sale. A negative residual from an illiquid quote or a contract that cannot currently be exercised requires analysis; do not silently clamp it to zero and call it a reliable valuation. Discounting, dividends, and exercise restrictions can also matter.</p>
+
+        <h2 id="history">13. Time Decay and the Supplied Price History</h2>
+
+        <p>Theta describes sensitivity to the passage of time, holding other pricing inputs constant. Long options generally lose time value as expiry approaches; that decay can be pronounced around the strike near expiry, but it is neither a fixed daily deduction nor a prediction that every observed premium must fall.</p>
+
+        <div class="reference-table" role="region" aria-label="Unverified historical option rows; all prices IRR per share" tabindex="0"><table><thead><tr><th scope="col">Date</th><th scope="col">Open</th><th scope="col">High</th><th scope="col">Low</th><th scope="col">Close</th><th scope="col">Last</th><th scope="col">Volume (contracts)</th><th scope="col">Data check</th></tr></thead><tbody><tr><td>2025-04-12</td><td>8</td><td>19</td><td>11</td><td>16</td><td>16</td><td>10,353</td><td>Invalid OHLC: open below low</td></tr><tr><td>2025-04-13</td><td>16</td><td>82</td><td>45</td><td>64</td><td>80</td><td>44,828</td><td>Invalid OHLC: open below low</td></tr><tr><td>2025-04-14</td><td>64</td><td>90</td><td>51</td><td>70</td><td>66</td><td>41,077</td><td>Range consistent; unverified</td></tr></tbody></table></div>
+
+        <p><strong>Do not draw candles from these inputs.</strong> The April 12 open of 8 is below the stated low of 11; the April 13 open of 16 is below the stated low of 45. Those are inconsistent if they describe the same session and price basis. The fields may be mislabelled or differently adjusted, but the source does not establish a correction. They remain flagged, not repaired.</p>
+
+        <figure class="options-figure"><a href="../../assets/charts/iranian-options-history.svg" aria-label="Open full-size chart: Supplied closing prices and trading volumes for April 12 to 14, 2025"><img src="../../assets/charts/iranian-options-history.svg" alt="Supplied closing prices and trading volumes for April 12 to 14, 2025" loading="lazy"></a><figcaption>Only supplied closes (IRR per underlying share) and volume (contracts) are plotted. These fields are not independently verified; open/high/low inconsistencies prevent a reliable candlestick chart.</figcaption></figure>
+
+        <p>The supplied closes rise 16 → 64 → 70 IRR across three sessions. This does not identify a cause: underlying moves, implied volatility, remaining time, order-book effects, and data adjustments may all contribute. No matching spot series or implied-volatility observations were supplied, so attributing the rise solely to bullish expectations or isolating theta would be unsupported.</p>
+
+        <h2 id="liquidity">14. Liquidity and Open Interest</h2>
+
+        <ul><li><strong>Volume:</strong> contracts traded during the session; repeated turnover can involve the same outstanding exposure.</li><li><strong>Open interest:</strong> outstanding contracts at a measurement time, counted once per matched long/short contract. It is not the sum of both sides and cannot be inferred from volume.</li><li><strong>Bid/ask spread:</strong> an immediate execution cost indicator; narrow spread alone does not establish depth.</li><li><strong>Order-book depth:</strong> quantities available at each price. A 354-contract sale may sweep multiple levels or fill only partially.</li></ul>
+
+        <p>The latest supplied volume is 41,077 contracts; that says nothing conclusive about whether 354 can be sold near the displayed last price now. Check current bids, quantities, timestamps, and partial-fill risk. No numerical open-interest or turnover-value series was included in the supplied extract, so neither is fabricated or charted. Last × volume × multiplier is not a substitute for actual session turnover across different execution prices.</p>
+
+        <h2 id="mistakes">15. Common Mistakes</h2>
+
+        <ul><li><strong>Mixing rial and toman:</strong> a tenfold error can invalidate cost, moneyness, exercise funding, and payoff. Label every input before multiplying.</li><li>Assuming 1,000 shares per contract instead of the supplied 4,407, or mixing adjustment dates.</li><li>Treating 64 IRR per underlying share as the cost of one whole contract.</li><li>Adding a 64-IRR premium directly to a 590-toman strike; the correct conditional addition is 590 + 6.4 toman.</li><li>Equating ITM with net profit, or treating break-even as a pre-expiration sale-price forecast.</li><li>Assuming every ITM option must be exercised or will settle automatically; ignoring valid exercise windows and instructions.</li><li>Ignoring time value, executable bids, depth, and the funding required for physical settlement.</li><li>Using last price for an entire 354-contract exit, or treating model intrinsic value as guaranteed cash proceeds.</li><li>Ignoring fees, taxes, financing, corporate-action adjustments, data inconsistencies, and settlement rules.</li></ul>
+
+        <h2 id="cheat-sheet">16. Quick Reference / Cheat Sheet</h2>
+
+        <pre tabindex="0" aria-label="Reusable formulas: normalize prices to one unit first"><code>Q = contracts x shares per contract
+Premium cost = entry premium x Q
+Call intrinsic/share = max(0, spot - strike)
+Put intrinsic/share = max(0, strike - spot)
+Long call expiry P/L = [max(0, spot - strike) - entry premium] x Q
+Long call break-even = strike + entry premium       (before costs)
+Physical call exercise funding = strike x Q        (additional cash)
+Closing P/L = (sale premium - entry premium) x shares closed - costs
+IRR to toman = divide by 10; toman to IRR = multiply by 10</code></pre>
+
+        <pre tabindex="0" aria-label="Before buying"><code>[ ] Verify underlying and exact contract
+[ ] Verify strike and rial/toman units
+[ ] Verify multiplier and corporate-action effective date
+[ ] Verify expiration year, exercise style, and cutoffs
+[ ] Check executable bid/ask, spread, and depth
+[ ] Check volume and open interest with timestamps
+[ ] Calculate maximum premium loss and before-cost break-even
+[ ] Understand fees, settlement requirements, and exercise funding</code></pre>
+
+        <pre tabindex="0" aria-label="Before expiration"><code>[ ] Check spot vs strike in the same unit
+[ ] Calculate intrinsic value
+[ ] Compare executable option bid with intrinsic value
+[ ] Estimate time value, fees, and realistic exit proceeds
+[ ] Check liquidity for the full intended quantity
+[ ] Calculate additional exercise cash
+[ ] Choose a feasible close, exercise, or expiry plan
+[ ] Submit required instructions on time and confirm the outcome</code></pre>
+
+        <p>Calculation inputs are available as <a href="../../assets/data/iranian-options-example.json">a small JSON dataset</a>. Figures and scenario tables are generated from the same IRR-based model. Historical inputs remain explicitly unverified; current exchange and broker notices must resolve the contract terms before operational use.</p>
+      </div>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>Senior DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="../../index.html#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="../../index.html#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <a class="article-next" href="restoring-a-gzip-mongodb-backup-in-docker.html"><span><small>Next field note</small><strong>Restoring a Gzip-Compressed MongoDB Backup in Docker</strong></span><span aria-hidden="true">→</span></a>
+    </article>
+  </main>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="../../index.html">Home</a><a href="../index.html">Writing</a><a href="../../index.html#contact">Contact</a></div></footer>
+</body>
+</html>
