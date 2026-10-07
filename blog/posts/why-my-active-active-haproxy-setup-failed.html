@@ -30,9 +30,9 @@
 </head>
 <body>
   <a class="skip-link" href="#main">Skip to content</a>
-  <header class="site-header wrap"><a class="brand" href="../../index.html" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a><nav class="nav" aria-label="Main navigation"><a href="../../index.html#work">Work</a><a href="../../index.html#experience">Experience</a><a href="../index.html" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="../../index.html#contact">Contact</a></nav></header>
+  <header class="site-header wrap"><a class="brand" href="/" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a><nav class="nav" aria-label="Main navigation"><a href="/#work">Work</a><a href="/#experience">Experience</a><a href="/blog/" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="/#contact">Contact</a></nav></header>
   <main id="main" class="article-shell">
-    <a class="back-link" href="../index.html"><span aria-hidden="true">←</span> All field notes</a>
+    <a class="back-link" href="/blog/"><span aria-hidden="true">←</span> All field notes</a>
     <article>
       <header class="article-header"><div class="post-meta"><span class="post-tag">Networking</span><time datetime="2026-10-05">October 5, 2026</time><span aria-hidden="true">/</span><span>11 min read</span></div><h1>Why my active-active HAProxy setup failed: ARP, shared VIPs, and the right way to design it</h1><p class="article-lead">Four HAProxy nodes owned one loopback VIP. DNS was simple and the service looked active-active. The Layer 2 network had a different idea.</p><p class="article-byline">By Hossein Moazami · Senior DevOps &amp; Platform Engineer</p></header>
       <div class="article-body">
@@ -181,10 +181,10 @@ hossein.cloud.  30  IN  A  192.0.2.14</code></pre>
         <p>The failure was not that a loopback address cannot be used as a service VIP. Loopbacks are common in routed anycast and ECMP designs. The failure was giving the same VIP to four hosts on one Layer 2 segment without a mechanism that controlled ownership or advertised multiple healthy routes.</p>
         <p>ARP can locate a neighbor. Gratuitous ARP can announce that an address moved. Linux ARP settings can reduce ambiguous replies. None of them provides active-active load balancing by itself. A correct design needs either one elected owner with VRRP, multiple routed next hops with ECMP/BGP, or multiple unique addresses with the understood limitations of DNS caching.</p>
       </div>
-      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>Senior DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="../../index.html#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="../../index.html#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>Senior DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="/#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="/#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
       <a class="article-next" href="making-kubernetes-workloads-boring-to-operate.html"><span><small>Next field note</small><strong>Making a Kubernetes workload boring to operate</strong></span><span aria-hidden="true">→</span></a>
     </article>
   </main>
-  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="../../index.html">Home</a><a href="https://github.com/hosseinmoazami" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:hossein.moazami.goodarzi@gmail.com">Email</a></div></footer>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="/">Home</a><a href="https://github.com/hosseinmoazami" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:hossein.moazami.goodarzi@gmail.com">Email</a></div></footer>
 </body>
 </html>
