@@ -463,7 +463,7 @@ a:focus-visible {
 .article-body pre:focus-visible { outline: 3px solid var(--brass-bright); outline-offset: 4px; }
 .article-body pre code { padding: 0; color: inherit; background: none; overflow-wrap: normal; }
 .article-body .reference-table { max-width: 100%; overflow-x: auto; margin-block: 24px; border: 1px solid var(--line); border-radius: 7px; }
-.article-body .reference-table:focus-visible { outline: 3px solid var(--brass-bright); outline-offset: 4px; }
+.article-body .reference-table:focus-visible { outline: 3px solid var(--brass); outline-offset: 4px; }
 .article-body .reference-table table { width: 100%; border-collapse: collapse; font-size: 15px; line-height: 1.65; }
 .article-body .reference-table th, .article-body .reference-table td { padding: 12px 15px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); }
 .article-body .reference-table th { background: var(--tint); color: var(--ink); }
