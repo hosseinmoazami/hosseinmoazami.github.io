@@ -215,7 +215,7 @@ code('Before expiration','''[ ] Check spot vs strike in the same unit
 p('Calculation inputs are available as <a href="../../assets/data/iranian-options-example.json">a small JSON dataset</a>. Figures and scenario tables are generated from the same IRR-based model. Historical inputs remain explicitly unverified; current exchange and broker notices must resolve the contract terms before operational use.')
 body='\n\n        '.join(parts);reading=f'{math.ceil(len(re.sub("<[^>]+>"," ",body).split())/220)} min read'
 s=(ROOT/'templates/post.html').read_text()
-for k,v in {'TITLE':TITLE,'DESCRIPTION':DESC,'CANONICAL_URL':f'https://hossein.cloud/blog/posts/{SLUG}.html','DATE_ISO':'2026-10-06','DATE_DISPLAY':'October 6, 2026','TOPIC':'Markets','READING_TIME':reading,'INTRODUCTION':DESC,'BODY':body}.items():s=s.replace('{{'+k+'}}',v)
+for k,v in {'TITLE':TITLE,'PAGE_TITLE':'Stock Options in the Iranian Market','DESCRIPTION':DESC,'CANONICAL_URL':f'https://hossein.cloud/blog/posts/{SLUG}.html','DATE_ISO':'2026-10-06','DATE_DISPLAY':'October 6, 2026','TOPIC':'Markets','READING_TIME':reading,'INTRODUCTION':DESC,'BODY':body}.items():s=s.replace('{{'+k+'}}',v)
 s=re.sub(r'<a href="https://github.com/hosseinmoazami".*?</a><a href="mailto:.*?</a>','<a href="/blog/">Writing</a><a href="/#contact">Contact</a>',s)
 s=s.replace('    </article>','      <a class="article-next" href="restoring-a-gzip-mongodb-backup-in-docker.html"><span><small>Next field note</small><strong>Restoring a Gzip-Compressed MongoDB Backup in Docker</strong></span><span aria-hidden="true">→</span></a>\n    </article>')
 (ROOT/'blog/posts'/f'{SLUG}.html').write_text(s)
