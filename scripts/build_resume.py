@@ -229,7 +229,7 @@ def build():
 
     story += section_title("Core skills", styles)
     for label, values in [
-        ("Platforms and automation", "Kubernetes, K3s, Helm, AWS, Linux, private cloud, Terraform, Ansible"),
+        ("Platforms and automation", "Kubernetes clusters, Helm, AWS, Linux, private cloud, Terraform, Ansible"),
         ("Delivery and observability", "GitLab CI/CD, Jenkins, GitOps, Prometheus, Grafana, ELK, OpenTelemetry"),
         ("Data and traffic", "MinIO, PostgreSQL, Nginx, HAProxy"),
         ("Software engineering", "Go, Python, Bash, JavaScript, React.js, REST APIs, FastAPI, Laravel"),
@@ -299,7 +299,7 @@ def build():
 
     story += section_title("Selected public project", styles)
     story.append(paragraph(
-        '<b><link href="https://github.com/hosseinmoazami/infra-implementation-hobby" color="#244F73">End-to-end infrastructure lab</link>:</b> Built a four-VM lab - one K3s control plane, two workers, and one builder - with Terraform/libvirt and Ansible. Added a private registry, GitLab Runner, kube-prometheus-stack, PostgreSQL HA, and a three-replica FastAPI deployment.',
+        '<b><link href="https://github.com/hosseinmoazami/infra-implementation-hobby" color="#244F73">End-to-end infrastructure lab</link>:</b> Built a four-VM infrastructure lab with a Kubernetes cluster comprising one control-plane node and two worker nodes, plus a dedicated builder, using Terraform/libvirt and Ansible. Added a private registry, GitLab Runner, kube-prometheus-stack, PostgreSQL HA, and a three-replica FastAPI deployment.',
         styles["project"],
     ))
     story.append(Spacer(1, 3))

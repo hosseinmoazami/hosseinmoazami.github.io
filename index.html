@@ -148,11 +148,11 @@
 
           <article class="case-card case-card-reference">
             <div class="case-topline"><span>Public engineering proof</span><span>GitHub</span></div>
-            <h3>A reproducible path from empty VMs to an observable K3s application platform.</h3>
-            <p>The public implementation provisions one control plane, two workers, and a builder, then connects delivery, monitoring, a highly available data layer, and a three-replica application.</p>
+            <h3>A reproducible path from empty VMs to an observable Kubernetes cluster.</h3>
+            <p>The public implementation provisions a Kubernetes cluster with one control-plane node, two worker nodes, and a dedicated builder, then connects delivery, monitoring, a highly available data layer, and a three-replica application.</p>
             <dl class="system-path">
               <div><dt>Provision</dt><dd>Terraform + libvirt</dd></div>
-              <div><dt>Configure</dt><dd>Ansible + K3s</dd></div>
+              <div><dt>Configure</dt><dd>Ansible-managed Kubernetes cluster</dd></div>
               <div><dt>Deliver</dt><dd>Private registry + GitLab Runner</dd></div>
               <div><dt>Operate</dt><dd>kube-prometheus-stack + PostgreSQL HA</dd></div>
               <div><dt>Run</dt><dd>Three-replica FastAPI deployment</dd></div>
