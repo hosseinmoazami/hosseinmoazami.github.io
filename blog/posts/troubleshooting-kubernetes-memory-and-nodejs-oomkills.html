@@ -26,7 +26,8 @@
   <link rel="icon" href="../../assets/favicon.ico" sizes="any">
   <link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32">
   <link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml">
-  <link rel="stylesheet" href="../../assets/style.css?v=a0f56fcb2cc1">
+  <link rel="stylesheet" href="../../assets/style.css?v=a522849802df">
+  <script src="../../assets/article-toc.js?v=0809d5e33473" defer></script>
   <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Troubleshooting High Memory Usage and OOMKilled Pods in Kubernetes","datePublished":"2026-10-10","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/troubleshooting-kubernetes-memory-and-nodejs-oomkills.html","image":"https://hossein.cloud/assets/og-card.png","description":"A Kubernetes and Node.js memory runbook: cgroups, process RSS, V8 headroom, Next.js retention, heap snapshots, and GC diagnostics."}</script>
 </head>
 <body>
@@ -35,14 +36,39 @@
     <a class="brand" href="/" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a>
     <nav class="nav" aria-label="Main navigation"><a href="/#work">Work</a><a href="/blog/" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="/#contact">Contact</a></nav>
   </header>
-  <main id="main" class="article-shell">
+  <main id="main" class="article-shell article-shell--toc">
     <a class="back-link" href="/blog/"><span aria-hidden="true">←</span> All field notes</a>
-    <article>
+    <article class="article-layout--toc">
       <header class="article-header"><div class="post-meta"><span class="post-tag">Kubernetes</span><time datetime="2026-10-10">October 10, 2026</time><span aria-hidden="true">/</span><span>14 min read</span></div><h1>Troubleshooting High Memory Usage and OOMKilled Pods in Kubernetes</h1><p class="article-lead">A Kubernetes and Node.js memory runbook: cgroups, process RSS, V8 headroom, Next.js retention, heap snapshots, and GC diagnostics.</p><p class="article-byline">By Hossein Moazami · DevOps &amp; Platform Engineer</p></header>
+      <aside class="article-toc" aria-label="Table of contents" data-article-toc>
+        <details open>
+          <summary><span id="toc-title" class="article-toc-title">Jump to</span><span class="article-toc-count">17 sections</span><span class="article-toc-icon" aria-hidden="true"></span></summary>
+          <nav class="article-toc-nav" aria-labelledby="toc-title">
+            <ol class="article-toc-list">
+              <li><a href="#symptoms">Symptoms</a></li>
+              <li><a href="#oom">OOMKilled &amp; exit 137</a></li>
+              <li><a href="#quick-checks">Kubernetes quick checks</a></li>
+              <li><a href="#cgroups">cgroup memory</a></li>
+              <li><a href="#process">Find the consuming process</a></li>
+              <li><a href="#status">/proc status</a></li>
+              <li><a href="#smaps">smaps_rollup</a></li>
+              <li><a href="#pitfall">node -e pitfall</a></li>
+              <li><a href="#runtime">Node vs Kubernetes limits</a></li>
+              <li><a href="#headroom">Heap headroom</a></li>
+              <li><a href="#trends">Stable usage vs leak</a></li>
+              <li><a href="#nextjs">Next.js investigation</a></li>
+              <li><a href="#snapshots">Heap snapshots &amp; GC</a></li>
+              <li><a href="#prometheus">Prometheus history</a></li>
+              <li><a href="#workflow">Decision tree</a></li>
+              <li><a href="#cheat-sheet">Command cheat sheet</a></li>
+              <li><a href="#takeaways">Key takeaways</a></li>
+            </ol>
+            <a class="article-toc-top" href="#main">Back to top <span aria-hidden="true">↑</span></a>
+          </nav>
+        </details>
+      </aside>
       <div class="article-body">
         <p>Start by identifying which layer owns the measurement: pod, container cgroup, Linux process, or JavaScript heap. A high value at one layer is a lead, not a diagnosis. This runbook uses sanitized observations from a Next.js memory investigation; it does not claim a confirmed leak or a measured fix.</p>
-
-        <p>Jump to: <a href="#quick-checks">Kubernetes commands</a> · <a href="#cgroups">cgroups</a> · <a href="#smaps">smaps_rollup</a> · <a href="#pitfall">New-process pitfall</a> · <a href="#headroom">Heap headroom</a> · <a href="#snapshots">Snapshots / GC</a> · <a href="#prometheus">PromQL</a> · <a href="#workflow">Decision flow</a> · <a href="#cheat-sheet">Cheat sheet</a>.</p>
 
         <h2 id="symptoms">1. Problem / Symptoms</h2>
 
