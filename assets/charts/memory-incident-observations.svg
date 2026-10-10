@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 695" role="img" aria-labelledby="title desc"><title id="title">Reported memory observations</title><desc id="desc">cgroup memory 1.8495 GiB; process VmRSS 1.8859 GiB; smaps RSS 1.8888 GiB and anonymous 1.8213 GiB. Samples and accounting differ; this is not an exact reconciliation.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#526777"/></marker></defs><style>text{font-family:system-ui,sans-serif;fill:#203c4a;font-size:17px}.title{font-size:21px;font-weight:700}.small{font-size:15px}.line{stroke:#526777;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<rect width="480" height="695" rx="12" fill="#f4f3ee"/>
+<text x="240" y="33" text-anchor="middle" class="title">Observed values, converted to GiB</text>
+<rect x="25" y="65" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="93" text-anchor="middle" class="">Cgroup charge: 1.8495 GiB</text>
+<text x="240" y="116" text-anchor="middle" class="">1,985,835,008 bytes</text>
+<path d="M240,141 L240,168" class="line"/>
+<rect x="25" y="177" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="205" text-anchor="middle" class="">next-server · PID 1</text>
+<text x="240" y="228" text-anchor="middle" class="">VmRSS: 1.8859 GiB</text>
+<path d="M240,253 L240,280" class="line"/>
+<rect x="25" y="289" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="317" text-anchor="middle" class="">smaps_rollup RSS: 1.8888 GiB</text>
+<text x="240" y="340" text-anchor="middle" class="">Anonymous: 1.8213 GiB (~96.4%)</text>
+<path d="M240,365 L240,392" class="line"/>
+<rect x="25" y="401" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="429" text-anchor="middle" class="">Private_Dirty: 1.8213 GiB</text>
+<text x="240" y="452" text-anchor="middle" class="">Overlaps Anonymous; do not add.</text>
+<rect x="25" y="518" width="430" height="84" rx="8" fill="#e7e2d2" stroke="#b2c4be"/>
+<text x="240" y="546" text-anchor="middle" class="">Application memory is the leading path.</text>
+<text x="240" y="569" text-anchor="middle" class="">Inspect V8, native allocations, caches.</text>
+<text x="240" y="635" text-anchor="middle" class="small">Different samples/accounting; not a proof of leak.</text>
+<text x="240" y="662" text-anchor="middle" class="small">Not a measurement of the earlier OOM peak.</text>
+</svg>

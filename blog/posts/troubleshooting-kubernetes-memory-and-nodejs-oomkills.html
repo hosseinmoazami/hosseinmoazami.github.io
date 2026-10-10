@@ -1,0 +1,336 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A Kubernetes and Node.js memory runbook: cgroups, process RSS, V8 headroom, Next.js retention, heap snapshots, and GC diagnostics.">
+  <meta name="author" content="Hossein Moazami">
+  <meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/blog/posts/troubleshooting-kubernetes-memory-and-nodejs-oomkills.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Kubernetes Memory and Node.js OOM Troubleshooting">
+  <meta property="og:description" content="A Kubernetes and Node.js memory runbook: cgroups, process RSS, V8 headroom, Next.js retention, heap snapshots, and GC diagnostics.">
+  <meta property="og:url" content="https://hossein.cloud/blog/posts/troubleshooting-kubernetes-memory-and-nodejs-oomkills.html">
+  <meta property="og:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <meta property="article:published_time" content="2026-10-10">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Kubernetes Memory and Node.js OOM Troubleshooting">
+  <meta name="twitter:description" content="A Kubernetes and Node.js memory runbook: cgroups, process RSS, V8 headroom, Next.js retention, heap snapshots, and GC diagnostics.">
+  <meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta name="twitter:image:alt" content="Hossein Moazami — Senior DevOps and Platform Engineer">
+  <!-- PAGE_TITLE: concise browser/share title; TITLE: full article headline. -->
+  <title>Kubernetes Memory and Node.js OOM Troubleshooting — Hossein Moazami</title>
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32">
+  <link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml">
+  <link rel="stylesheet" href="../../assets/style.css?v=a0f56fcb2cc1">
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Troubleshooting High Memory Usage and OOMKilled Pods in Kubernetes","datePublished":"2026-10-10","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/troubleshooting-kubernetes-memory-and-nodejs-oomkills.html","image":"https://hossein.cloud/assets/og-card.png","description":"A Kubernetes and Node.js memory runbook: cgroups, process RSS, V8 headroom, Next.js retention, heap snapshots, and GC diagnostics."}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a>
+    <nav class="nav" aria-label="Main navigation"><a href="/#work">Work</a><a href="/blog/" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="/#contact">Contact</a></nav>
+  </header>
+  <main id="main" class="article-shell">
+    <a class="back-link" href="/blog/"><span aria-hidden="true">←</span> All field notes</a>
+    <article>
+      <header class="article-header"><div class="post-meta"><span class="post-tag">Kubernetes</span><time datetime="2026-10-10">October 10, 2026</time><span aria-hidden="true">/</span><span>14 min read</span></div><h1>Troubleshooting High Memory Usage and OOMKilled Pods in Kubernetes</h1><p class="article-lead">A Kubernetes and Node.js memory runbook: cgroups, process RSS, V8 headroom, Next.js retention, heap snapshots, and GC diagnostics.</p><p class="article-byline">By Hossein Moazami · Senior DevOps &amp; Platform Engineer</p></header>
+      <div class="article-body">
+        <p>Start by identifying which layer owns the measurement: pod, container cgroup, Linux process, or JavaScript heap. A high value at one layer is a lead, not a diagnosis. This runbook uses sanitized observations from a Next.js memory investigation; it does not claim a confirmed leak or a measured fix.</p>
+
+        <p>Jump to: <a href="#quick-checks">Kubernetes commands</a> · <a href="#cgroups">cgroups</a> · <a href="#smaps">smaps_rollup</a> · <a href="#pitfall">New-process pitfall</a> · <a href="#headroom">Heap headroom</a> · <a href="#snapshots">Snapshots / GC</a> · <a href="#prometheus">PromQL</a> · <a href="#workflow">Decision flow</a> · <a href="#cheat-sheet">Cheat sheet</a>.</p>
+
+        <h2 id="symptoms">1. Problem / Symptoms</h2>
+
+        <p>The supplied workload had a previous OOM termination and current memory around 1.85–1.9 GiB during investigation. Its container resources were approximately:</p>
+
+        <pre tabindex="0" aria-label="Example container resource settings"><code class="language-yaml">resources:
+  requests:
+    cpu: "1"
+    memory: "1536Mi"
+  limits:
+    cpu: "2"
+    memory: "4Gi"</code></pre>
+
+        <pre tabindex="0" aria-label="Reported previous container state"><code class="language-text">Last State: Terminated
+Reason: OOMKilled
+Exit Code: 137
+Restart Count: 1</code></pre>
+
+        <p>The current readings are from the restarted workload, not the killed process’s peak. Do not conclude that a 4 GiB limit killed a process at 1.9 GiB merely because that is what the replacement process uses now.</p>
+
+        <h2 id="oom">2. Understanding OOMKilled and Exit Code 137</h2>
+
+        <p><code>OOMKilled</code> records an out-of-memory kill. A container cgroup reaching an enforced memory ceiling is a common cause; node-wide memory exhaustion can also kill a process. Inspect cgroup events and node evidence to distinguish them. Exit code 137 normally means <code>128 + 9</code>, or SIGKILL, but 137 alone is not proof of an OOM: another actor can send that signal.</p>
+
+        <p>The reported restart count indicates that Kubernetes restarted this container. A memory limit is an enforced ceiling, not a target working set. A request is primarily used in scheduling and resource management; exceeding the 1536 MiB request does not by itself trigger a kill. A request is not a guarantee that the application cannot encounter memory pressure. See Kubernetes’ <a href="https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/">resource-management documentation</a>.</p>
+
+        <figure class="memory-figure"><a href="../../assets/charts/memory-investigation-layers.svg" aria-label="Open full-size diagram: Memory investigation layers and tools"><img src="../../assets/charts/memory-investigation-layers.svg" alt="Memory investigation layers and tools" loading="lazy"></a><figcaption>Move down the layers to explain the measurement. Working set, cgroup charge, RSS, and heap overlap and have different accounting boundaries.</figcaption></figure>
+
+        <h2 id="quick-checks">3. Quick Kubernetes Memory Checks</h2>
+
+        <p>Run these on your administrative workstation. Replace quoted placeholders before use; quotes prevent angle brackets from being interpreted as shell redirection.</p>
+
+        <pre tabindex="0" aria-label="Workstation: current pod and container memory"><code class="language-bash">kubectl top pod
+kubectl top pod -n '&lt;namespace&gt;'
+kubectl top pod -A --sort-by=memory
+kubectl top pod '&lt;pod-name&gt;' -n '&lt;namespace&gt;'
+kubectl top pod '&lt;pod-name&gt;' --containers -n '&lt;namespace&gt;'
+watch -n 5 "kubectl top pod '&lt;pod-name&gt;' -n '&lt;namespace&gt;'"</code></pre>
+
+        <p><code>kubectl top</code> requires a working resource metrics API, commonly provided by Metrics Server. Its memory view is a current working-set estimate, not JavaScript heap or an exact cgroup total. Scrape delays can miss a short spike. Use <code>--containers</code> to separate the application from sidecars, and historical graphs to inspect the failure window.</p>
+
+        <pre tabindex="0" aria-label="Workstation: termination evidence and previous logs"><code class="language-bash">kubectl describe pod '&lt;pod-name&gt;' -n '&lt;namespace&gt;'
+kubectl logs '&lt;pod-name&gt;' -n '&lt;namespace&gt;' -c server --previous
+kubectl logs '&lt;pod-name&gt;' -n '&lt;namespace&gt;' -c server --previous --tail=200</code></pre>
+
+        <p>Find the terminated container’s reason, exit code, finish time, and restart count. Inspect events and node memory pressure if the evidence suggests node OOM or eviction. The generic container name <code>server</code> must match the target. Previous logs cover the previous container instance when retained; a hard SIGKILL may leave no application stack trace. An <code>Evicted</code> pod is a different lifecycle event from a container OOM restart.</p>
+
+        <pre tabindex="0" aria-label="Workstation: enter the target container"><code class="language-bash">kubectl exec -it '&lt;pod-name&gt;' -n '&lt;namespace&gt;' -c server -- sh</code></pre>
+
+        <p>The Linux commands below run in that container. Minimal images may lack a shell, procps, awk, or permission to read another process. Use an approved diagnostic image with the correct PID/cgroup visibility when needed; do not assume an ephemeral debug container sees the target’s cgroup just because it sees its processes.</p>
+
+        <h2 id="cgroups">4. Inspecting Container Memory With cgroups</h2>
+
+        <pre tabindex="0" aria-label="Container: check cgroup scope and v2 accounting"><code class="language-bash">cat /proc/self/cgroup
+cat /proc/1/cgroup
+cat /proc/self/mountinfo | grep cgroup
+cat /sys/fs/cgroup/memory.current
+cat /sys/fs/cgroup/memory.max
+cat /sys/fs/cgroup/memory.events
+cat /sys/fs/cgroup/memory.stat</code></pre>
+
+        <p>These paths assume cgroup v2 with the target container’s cgroup mounted at the visible root. If not, resolve the process’s cgroup path against the cgroup mount. Ancestor limits may also constrain it. A v2 membership line uses <code>0::</code>; the visible namespace path can be <code>/</code>. Verify scope rather than comparing a pod parent to one child process.</p>
+
+        <pre tabindex="0" aria-label="Observed memory.current value"><code class="language-text">1985835008</code></pre>
+
+        <pre tabindex="0" aria-label="Container: convert bytes to GiB"><code class="language-bash">awk '{printf "%.2f GiB\n", $1/1024/1024/1024}' /sys/fs/cgroup/memory.current</code></pre>
+
+        <p>The supplied value is <strong>1.8495 GiB</strong> (about 1.85 GiB). <code>memory.current</code> reports bytes charged to the cgroup and its descendants: this can include anonymous memory, file cache, and kernel memory. It is not merely a sum of JavaScript heaps. <code>memory.max</code> is the hard limit in bytes, or <code>max</code> if no limit is set there; 4 GiB is 4,294,967,296 bytes.</p>
+
+        <p>Use <code>memory.stat</code> to inspect <code>anon</code>, <code>file</code>, <code>shmem</code>, and kernel charges; fields can overlap, so do not sum all lines. In <code>memory.events</code>, <code>max</code>, <code>oom</code>, and <code>oom_kill</code> distinguish limit encounters from kills. Their counters are not a timestamped history, and a recreated cgroup may not retain the earlier event. The <a href="https://www.kernel.org/doc/html/latest/admin-guide/cgroup-v2.html">kernel cgroup v2 reference</a> defines these fields.</p>
+
+        <pre tabindex="0" aria-label="Container: common cgroup v1 equivalents"><code class="language-bash">cat /sys/fs/cgroup/memory/memory.usage_in_bytes
+cat /sys/fs/cgroup/memory/memory.limit_in_bytes</code></pre>
+
+        <p>Those v1 paths also depend on mount layout. Do not mix v1 filenames with v2 or assume a large v1 limit value is a meaningful application budget.</p>
+
+        <h2 id="process">5. Finding the Process Consuming Memory</h2>
+
+        <pre tabindex="0" aria-label="Container: identify the real application process"><code class="language-bash">ps -eo pid,ppid,%mem,rss,vsz,args --sort=-rss
+ps -ef
+pgrep -a node
+ps -p 1 -f
+cat /proc/1/cmdline | tr '\0' ' '
+printf '\n' </code></pre>
+
+        <p>The observed application was <code>next-server</code> at PID 1. Verify that in your container before using <code>/proc/1</code>; PID 1 might instead be an init process or shell. A renamed process can be missed by <code>pgrep -a node</code>. GNU procps supports the sorting command; BusyBox variants may not.</p>
+
+        <p>RSS is resident memory; VSZ is virtual address space. A large reservation is not equivalent to RAM in use. The <code>%mem</code> denominator may reflect host memory rather than the container limit, so compare bytes against the effective cgroup limit instead. Multiple workers require checking all relevant PIDs; summing RSS can double-count shared pages.</p>
+
+        <h2 id="status">6. Understanding /proc/&lt;pid&gt;/status</h2>
+
+        <pre tabindex="0" aria-label="Container: inspect PID 1 memory fields"><code class="language-bash">grep -E 'VmRSS|VmSize|VmData|VmSwap' /proc/1/status</code></pre>
+
+        <pre tabindex="0" aria-label="Sanitized process status supplied in the investigation"><code class="language-text">VmSize:  11435292 kB
+VmRSS:    1977468 kB
+VmData:   2528644 kB
+VmSwap:         0 kB</code></pre>
+
+        <div class="reference-table" role="region" aria-label="Process status memory fields" tabindex="0"><table><thead><tr><th scope="col">Field</th><th scope="col">Interpretation</th></tr></thead><tbody><tr><td>VmSize</td><td>Virtual address space, including reservations and mappings; not physical RAM usage.</td></tr><tr><td>VmRSS</td><td>Resident pages mapped by this process; includes shared pages and is approximate.</td></tr><tr><td>VmData</td><td>Virtual data-segment size; not the V8 heap or a resident-only measurement.</td></tr><tr><td>VmSwap</td><td>Swapped private anonymous memory reported for the process; not every possible shared-memory swap charge.</td></tr></tbody></table></div>
+
+        <p>Linux reports these “kB” fields in units of 1024 bytes. The supplied VmRSS is <strong>1.8859 GiB</strong>. That is close in scale to the 1.8495-GiB cgroup charge, but is not an exact reconciliation. Different sample times, shared-page accounting, and approximate counters can explain a process RSS larger than cgroup usage. Capture comparable samples before assigning the discrepancy a cause.</p>
+
+        <h2 id="smaps">7. Deep-Diving With smaps_rollup</h2>
+
+        <pre tabindex="0" aria-label="Container: aggregate process memory mappings"><code class="language-bash">cat /proc/1/smaps_rollup</code></pre>
+
+        <pre tabindex="0" aria-label="Sanitized smaps_rollup observations"><code class="language-text">Rss:             1980548 kB
+Pss:             1927585 kB
+Private_Dirty:   1909804 kB
+Anonymous:       1909776 kB
+Swap:                  0 kB</code></pre>
+
+        <div class="reference-table" role="region" aria-label="smaps_rollup interpretation" tabindex="0"><table><thead><tr><th scope="col">Field</th><th scope="col">What it means</th></tr></thead><tbody><tr><td>Rss</td><td>Resident pages mapped into the process, counting shared pages in each mapping owner.</td></tr><tr><td>Pss</td><td>Resident memory with shared pages apportioned among processes.</td></tr><tr><td>Anonymous</td><td>Memory not backed by ordinary files, often including heaps and native allocations.</td></tr><tr><td>Private_Dirty</td><td>Modified private pages; overlaps anonymous memory and is not an extra bucket to add to it.</td></tr><tr><td>Swap</td><td>Mapped memory moved to swap, as reported for these mappings.</td></tr></tbody></table></div>
+
+        <p>The supplied Rss is <strong>1.8888 GiB</strong>, Pss is <strong>1.8383 GiB</strong>, and Anonymous is <strong>1.8213 GiB</strong>, roughly <strong>96.4%</strong> of this Rss. Private_Dirty is also about 1.8213 GiB. These are overlapping classifications, not two separate 1.82-GiB allocations. The <a href="https://docs.kernel.org/filesystems/proc.html">kernel /proc documentation</a> explains the accounting.</p>
+
+        <figure class="memory-figure"><a href="../../assets/charts/memory-incident-observations.svg" aria-label="Open full-size diagram: Reported cgroup, RSS, and anonymous memory"><img src="../../assets/charts/memory-incident-observations.svg" alt="Reported cgroup, RSS, and anonymous memory" loading="lazy"></a><figcaption>The values support investigating the application’s anonymous memory. They do not identify which runtime allocator owns it or reconstruct the previous OOM peak.</figcaption></figure>
+
+        <p><strong>Interpretation:</strong> application-owned anonymous mappings are the leading explanation for the process footprint. Investigate JavaScript retention, native allocations, Buffers, libraries, and caches. The small non-anonymous remainder weakens the “mostly mapped files” explanation, but unmapped filesystem cache is not measured by process smaps. Check cgroup file charges before ruling out cache; Kubernetes and node pressure are not categorically eliminated by this snapshot.</p>
+
+        <h2 id="pitfall">8. Common Mistake: node -e Measures a New Process</h2>
+
+        <pre tabindex="0" aria-label="This measures only a temporary Node.js process"><code class="language-bash">node -e "console.log(process.memoryUsage())"</code></pre>
+
+        <p>A result around 45 MB RSS and 4 MB heapUsed belongs to the new diagnostic process launched by this command. It does <strong>not</strong> inspect the running Next.js process, even when executed in the same container. It cannot contradict the application’s 1.9-GiB RSS.</p>
+
+        <p>Expose memory telemetry from code running in the application process, or use an already-authorized profiler for that process. An example to integrate temporarily into a controlled server entry point is:</p>
+
+        <pre tabindex="0" aria-label="Application code: sample the process that executes this code"><code class="language-javascript">const timer = setInterval(() =&gt; {
+  const { rss, heapUsed, heapTotal, external, arrayBuffers } = process.memoryUsage();
+  console.log({ rss, heapUsed, heapTotal, external, arrayBuffers });
+}, 30000);
+timer.unref();</code></pre>
+
+        <p>Values are bytes. <code>heapUsed</code> and <code>heapTotal</code> describe V8 heap usage; <code>external</code> includes memory associated with native objects, and <code>arrayBuffers</code> includes Node Buffers and is already included in external. Do not sum these overlapping fields into RSS. Stable heap with increasing RSS redirects attention toward native memory, Buffers, mappings, and fragmentation. Worker threads complicate isolate-level heap accounting; record which process/isolate emits each sample.</p>
+
+        <h2 id="runtime">9. Node.js Memory vs Kubernetes Memory Limits</h2>
+
+        <p>The supplied runtime environment reported Node 24.11.1, production mode, and a 4096-MiB old-generation ceiling. Inspect only the needed keys; a broad environment dump can contain credentials.</p>
+
+        <pre tabindex="0" aria-label="Container: inspect selected runtime settings"><code class="language-bash">tr '\0' '\n' &lt; /proc/1/environ | grep -E '^(NODE_VERSION|NODE_OPTIONS|NODE_ENV)='</code></pre>
+
+        <pre tabindex="0" aria-label="Supplied configuration, not a new runtime measurement"><code class="language-text">NODE_VERSION=24.11.1
+NODE_OPTIONS=--max-old-space-size=4096
+NODE_ENV=production</code></pre>
+
+        <p>The environment records configuration, not proof of the effective heap limit: command-line arguments can override options, and environment version labels can be stale. Inspect the actual command and deployment entry point. Even selected option values should be reviewed before sharing because preload paths or arguments can contain internal names.</p>
+
+        <figure class="memory-figure"><a href="../../assets/charts/node-container-memory-budget.svg" aria-label="Open full-size diagram: Node.js old space is only part of the container budget"><img src="../../assets/charts/node-container-memory-budget.svg" alt="Node.js old space is only part of the container budget" loading="lazy"></a><figcaption>Conceptual compartments, not measured sizes. The V8 old generation is only part of heap, which is only part of RSS; the cgroup also accounts for memory outside that process.</figcaption></figure>
+
+        <h2 id="headroom">10. Why 4096 MiB Old Space With a 4 GiB Limit Is Risky</h2>
+
+        <p><code>--max-old-space-size=4096</code> sets an old-generation ceiling in MiB. It neither reserves that amount nor limits all RSS. Other V8 spaces, Node runtime allocations, Buffers/ArrayBuffers, native addons, Sharp image buffers, OpenSSL, ICU, thread stacks, shared libraries, and allocator fragmentation require additional space. Other processes and cgroup charges also matter.</p>
+
+        <p>If old space approaches 4096 MiB, the other charges can push the container into OOM before V8 reaches its own configured ceiling. This is an unsafe budget configuration, but the approximately 1.9-GiB sample alone does not establish that it caused the prior OOM. The <a href="https://nodejs.org/download/release/v24.11.1/docs/api/cli.html">version-matched Node CLI reference</a> defines the option and allowed environment flags.</p>
+
+        <pre tabindex="0" aria-label="Candidate launch settings to test, not universal defaults"><code class="language-bash"># Choose one value in the workload configuration, then roll out a test replica.
+NODE_OPTIONS="--max-old-space-size=3072"
+
+# Alternative with more nominal room for non-old-space memory:
+NODE_OPTIONS="--max-old-space-size=2816"</code></pre>
+
+        <p>These leave 1024 MiB or 1280 MiB respectively between the old-space ceiling and a 4096-MiB container limit—not a guaranteed native-memory allowance. Measure representative peak concurrency, images, cache warm-up, and native memory. Lowering the limit can increase GC pressure or cause a V8 heap-limit failure sooner. Changing a variable in an exec shell does not reconfigure PID 1; update the launch configuration and replace the test container.</p>
+
+        <h2 id="trends">11. Stable Usage vs a Possible Memory Leak</h2>
+
+        <pre tabindex="0" aria-label="Illustrative successive readings, not a captured incident time series"><code class="language-text">Stable candidate: 1.8 -&gt; 1.9 -&gt; 2.0 -&gt; 1.9 -&gt; 2.0 GiB
+Growth candidate: 500 MiB -&gt; 900 MiB -&gt; 1.5 -&gt; 2.1 -&gt; 2.8 -&gt; 3.5 -&gt; 3.9 GiB</code></pre>
+
+        <figure class="memory-figure"><a href="../../assets/charts/memory-stable-versus-growth.svg" aria-label="Open full-size diagram: Stable working set versus possible unbounded memory growth"><img src="../../assets/charts/memory-stable-versus-growth.svg" alt="Stable working set versus possible unbounded memory growth" loading="lazy"></a><figcaption>Illustrative paths only. A rising curve can suggest a leak or unbounded cache, but needs correlation with load, uptime, and post-GC retained memory.</figcaption></figure>
+
+        <p>A stable high footprint can be a capacity or configuration issue. Persistent growth warrants investigating retained objects, cache cardinality, long-lived connections, request/session state, and native allocations. Traffic growth and cache warm-up can also produce a rising curve. Compare equivalent traffic windows and the baseline after major GC; distinguish within-process growth from restart resets. Increasing the limit may only delay an OOM if growth remains unbounded.</p>
+
+        <h2 id="nextjs">12. Next.js-Specific Memory Investigation</h2>
+
+        <div class="reference-table" role="region" aria-label="Next.js investigation targets" tabindex="0"><table><thead><tr><th scope="col">Area</th><th scope="col">Questions and evidence</th></tr></thead><tbody><tr><td>JavaScript retention</td><td>Inspect global arrays/Maps, singleton caches, closures, event listeners, timers, session state, and request objects retained past their useful lifetime.</td></tr><tr><td>Caching</td><td>Inventory App Router/fetch caching, ISR, unstable_cache, and custom caches. Confirm behavior for the deployed Next.js version; not every cache is in-process RAM. Measure key cardinality, byte size, TTL, and eviction.</td></tr><tr><td>Image optimization</td><td>Correlate next/image and Sharp activity with image dimensions, concurrent transforms, Buffers, external memory, and RSS. Native allocations may be poorly represented by ordinary JS heap totals.</td></tr><tr><td>SSR and serialization</td><td>Measure large API responses, intermediate objects, rendered payloads, concurrency peaks, and accidental retention between requests.</td></tr></tbody></table></div>
+
+        <pre tabindex="0" aria-label="Potentially unbounded cache pattern; not a diagnosis by itself"><code class="language-javascript">const cache = new Map();
+// Entries keyed by unbounded request-specific values can accumulate.
+// Measure growth and apply a workload-appropriate bound and eviction policy.</code></pre>
+
+        <p>Separate the deployed server from <code>next build</code> memory. Build-only debugging flags do not diagnose a running next-server. The <a href="https://nextjs.org/docs/app/guides/self-hosting">Next.js self-hosting guide</a> describes cache configuration; verify it against the version actually deployed. A cache or image library is a hypothesis here, not an observed culprit.</p>
+
+        <h2 id="snapshots">13. Heap Snapshots and GC Diagnostics</h2>
+
+        <p><strong>Warning:</strong> snapshot creation pauses work and can consume substantial additional memory, potentially crashing a near-limit process. Use a controlled replica or staging environment with headroom and a writable diagnostic directory. Heap snapshots may contain request data, tokens, and secrets: restrict access and retention, and never publish the files.</p>
+
+        <pre tabindex="0" aria-label="Controlled replica: configure the launch environment before starting Node"><code class="language-bash">NODE_OPTIONS="--max-old-space-size=3072 --heapsnapshot-signal=SIGUSR2 --diagnostic-dir=/tmp/node-diagnostics"</code></pre>
+
+        <p>Create and permission the diagnostic directory for the application account before launch, with enough space. If it is backed by a memory-based volume, snapshot output itself adds memory pressure. Confirm the process actually started with the signal handler and that PID 1 is the intended Node process. Only then request a snapshot from inside that container:</p>
+
+        <pre tabindex="0" aria-label="Container: signal only a confirmed, snapshot-enabled Node PID"><code class="language-bash">kill -USR2 1</code></pre>
+
+        <p>Do not send SIGUSR2 blindly: without the configured handler it can terminate an ordinary process, and PID 1 has special signal behavior. Editing NODE_OPTIONS after startup does not install the handler. Use the actual Node PID if it is not 1. Load the resulting <code>.heapsnapshot</code> in Chrome DevTools’ Memory panel and compare snapshots after equivalent workload cycles. Follow the <a href="https://nodejs.org/learn/diagnostics/memory/using-heap-snapshot">Node snapshot guidance</a>.</p>
+
+        <ul><li>Inspect retained size, retaining paths, and dominators—not only shallow object size.</li><li>Look for growing Maps/Sets, request arrays, duplicated strings, cached responses, and unexpected object graphs surviving collections.</li><li>Buffers may expose wrapper objects and references, but a heap snapshot is not a complete native allocator profile. If heap is stable while RSS grows, investigate native/external memory separately.</li></ul>
+
+        <p><strong>GC tracing correction:</strong> do not put <code>--trace-gc</code> in <code>NODE_OPTIONS</code> for this Node version; it is not an allowed environment flag and can prevent startup. Pass it directly to Node in a controlled test launch. Choose the command matching the deployment layout:</p>
+
+        <pre tabindex="0" aria-label="Controlled launch: GC tracing for the actual server entry point"><code class="language-bash"># Standard Next.js installation; run from the application directory.
+node --max-old-space-size=3072 --trace-gc ./node_modules/next/dist/bin/next start
+
+# Alternative: a standalone Next.js output with server.js as its entry point.
+node --max-old-space-size=3072 --trace-gc server.js</code></pre>
+
+        <p>These are alternatives, not commands to start alongside an already-running server. Preserve the deployment’s required arguments and environment. Tracing can be noisy and add overhead; scope its duration and remove it after diagnosis. The <a href="https://nodejs.org/learn/diagnostics/memory/using-gc-traces">Node GC tracing guide</a> explains before/after heap values and collector events.</p>
+
+        <pre tabindex="0" aria-label="Conceptual major-GC examples; not observations from this incident"><code class="language-text">3200 MB -&gt; 3195 MB: little reclaimed; substantial live/retained heap
+2000 MB -&gt;  600 MB: substantial reclaimable allocation pressure</code></pre>
+
+        <p>These are generic illustrative GC-log values, not expected readings under the 3072-MiB example. They refer to heap figures, not whole-process RSS or cgroup charge. A persistently rising post-major-GC baseline under comparable work suggests retention; a single collection proves neither a leak nor health. Native allocations and fragmentation can keep RSS high even when V8 heap drops.</p>
+
+        <h2 id="prometheus">14. Prometheus Queries for Historical Analysis</h2>
+
+        <p>These queries assume cAdvisor/kubelet container metrics are scraped, with the shown labels. Availability and precise accounting vary by platform. Restrict to one cluster and a non-duplicated scrape source before aggregating; otherwise identical containers may be counted more than once.</p>
+
+        <pre tabindex="0" aria-label="Current container working-set estimate"><code class="language-promql">container_memory_working_set_bytes{
+  namespace="&lt;namespace&gt;",
+  pod="&lt;pod-name&gt;",
+  container="server"
+}</code></pre>
+
+        <pre tabindex="0" aria-label="Container RSS metric where available"><code class="language-promql">container_memory_rss{
+  namespace="&lt;namespace&gt;",
+  pod="&lt;pod-name&gt;",
+  container="server"
+}</code></pre>
+
+        <p>Working set typically excludes inactive file cache, but is neither exact non-reclaimable memory nor JavaScript heap. cAdvisor’s container RSS is cgroup-derived and is not interchangeable with the sum of process VmRSS. Compare trends at the same scope; use memory.stat and process mappings to explain the components.</p>
+
+        <pre tabindex="0" aria-label="Top ten pod working sets"><code class="language-promql">topk(
+  10,
+  sum by (namespace, pod) (
+    container_memory_working_set_bytes{
+      container!="",
+      container!="POD"
+    }
+  )
+)</code></pre>
+
+        <pre tabindex="0" aria-label="CPU consumption rate for correlation, in CPU cores"><code class="language-promql">rate(
+  container_cpu_usage_seconds_total{
+    namespace="&lt;namespace&gt;",
+    pod="&lt;pod-name&gt;",
+    container="server"
+  }[5m]
+)</code></pre>
+
+        <p>Overlay memory with request rate, concurrency, CPU/GC, restarts, deployments, and uptime. Look for plateaus, gradual growth, image/SSR spikes, and periodic reclaim. A five-second top sample or a coarser Prometheus scrape can miss the OOM peak; absence of a sampled limit crossing does not refute an OOM. CPU correlation can suggest GC or workload pressure, but does not establish causality.</p>
+
+        <h2 id="workflow">15. Troubleshooting Decision Tree</h2>
+
+        <figure class="memory-figure"><a href="../../assets/charts/memory-troubleshooting-flow.svg" aria-label="Open full-size diagram: Decision flow from OOM evidence to application profiling"><img src="../../assets/charts/memory-troubleshooting-flow.svg" alt="Decision flow from OOM evidence to application profiling" loading="lazy"></a><figcaption>Use the branches as investigation prompts. Comparable RSS points toward the process; it does not make the different accounting layers identical.</figcaption></figure>
+
+        <ul><li><a href="#oom">Confirm the termination</a>: distinguish cgroup OOM, node pressure, eviction, and a non-OOM SIGKILL.</li><li><a href="#cgroups">Resolve the container scope</a>: inspect limits, charge categories, and event counters.</li><li><a href="#process">Locate the largest process</a>: compare RSS/PSS with cgroup usage in the same time window.</li><li><a href="#smaps">Classify mappings</a>: anonymous-heavy suggests runtime/application memory; large cgroup file charges need a separate cache investigation.</li><li><a href="#headroom">Check runtime headroom</a>: old-space ceiling must leave room for all other memory.</li><li><a href="#trends">Observe the trend</a>: stable usage leads to capacity and concurrency checks; persistent growth leads to retention, cache, or native profiling.</li></ul>
+
+        <h2 id="cheat-sheet">16. Command Cheat Sheet</h2>
+
+        <pre tabindex="0" aria-label="Workstation: Kubernetes evidence"><code class="language-bash">kubectl top pod -n '&lt;namespace&gt;'
+kubectl top pod '&lt;pod-name&gt;' --containers -n '&lt;namespace&gt;'
+kubectl describe pod '&lt;pod-name&gt;' -n '&lt;namespace&gt;'
+kubectl logs '&lt;pod-name&gt;' -n '&lt;namespace&gt;' -c server --previous --tail=200
+kubectl exec -it '&lt;pod-name&gt;' -n '&lt;namespace&gt;' -c server -- sh</code></pre>
+
+        <pre tabindex="0" aria-label="Container: cgroup v2 and the confirmed application PID"><code class="language-bash">cat /sys/fs/cgroup/memory.current
+cat /sys/fs/cgroup/memory.max
+cat /sys/fs/cgroup/memory.events
+cat /sys/fs/cgroup/memory.stat
+awk '{printf "%.2f GiB\n", $1/1024/1024/1024}' /sys/fs/cgroup/memory.current
+
+ps -eo pid,ppid,%mem,rss,vsz,args --sort=-rss
+pgrep -a node
+grep -E 'VmRSS|VmSize|VmData|VmSwap' /proc/1/status
+cat /proc/1/smaps_rollup
+cat /proc/1/cmdline | tr '\0' ' '
+printf '\n'
+tr '\0' '\n' &lt; /proc/1/environ | grep -E '^(NODE_VERSION|NODE_OPTIONS|NODE_ENV)=' </code></pre>
+
+        <p>Use PID 1 only after identification, and the cgroup paths only after verifying their scope. Bytes ÷ 1,073,741,824 = GiB; /proc kB ÷ 1,048,576 = GiB. Do not compare decimal GB with binary GiB without conversion.</p>
+
+        <h2 id="takeaways">17. Key Takeaways</h2>
+
+        <ul><li>Observed: a previous OOMKilled termination, approximately 1.85-GiB current cgroup charge, a similarly sized next-server RSS, and predominantly anonymous mappings.</li><li>Supported inference: runtime/application memory is the leading investigation path. The data does not isolate JavaScript heap from native allocations or prove a leak.</li><li>Configuration concern: a 4096-MiB old-space ceiling leaves no nominal room under a 4-GiB container ceiling for other charges. Test a measured headroom budget.</li><li>Next evidence: time-series data and in-process metrics, followed by controlled snapshots or GC/native diagnostics. No successful remediation or eliminated root cause is claimed from these observations alone.</li></ul>
+      </div>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>Senior DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="/#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="/#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <a class="article-next" href="stock-options-in-the-iranian-market.html"><span><small>Next field note</small><strong>Stock Options in the Iranian Market: A Practical Knowledge Base</strong></span><span aria-hidden="true">→</span></a>
+    </article>
+  </main>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="/">Home</a><a href="/blog/">Writing</a><a href="/#contact">Contact</a></div></footer>
+</body>
+</html>

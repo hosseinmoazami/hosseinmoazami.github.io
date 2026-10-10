@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 1150" role="img" aria-labelledby="title desc"><title id="title">Memory troubleshooting decision flow</title><desc id="desc">Branch on process RSS relative to cgroup charges, then classify mappings and choose capacity or growth investigation.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#526777"/></marker></defs><style>text{font-family:system-ui,sans-serif;fill:#203c4a;font-size:17px}.title{font-size:21px;font-weight:700}.small{font-size:15px}.line{stroke:#526777;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<rect width="480" height="1150" rx="12" fill="#f4f3ee"/>
+<text x="240" y="32" text-anchor="middle" class="title">OOMKilled: follow the evidence</text>
+<rect x="25" y="60" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="88" text-anchor="middle" class="">describe + previous logs</text>
+<text x="240" y="111" text-anchor="middle" class="">Check reason, time, restart, and node</text>
+<path d="M240,136 L240,163" class="line"/>
+<rect x="25" y="174" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="202" text-anchor="middle" class="">top --containers + cgroup files</text>
+<text x="240" y="225" text-anchor="middle" class="">current / max / events / stat</text>
+<path d="M240,250 L240,277" class="line"/>
+<rect x="25" y="288" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="316" text-anchor="middle" class="">Find actual PID; compare RSS to charge</text>
+<text x="240" y="339" text-anchor="middle" class="">Same scope and sampling window</text>
+<path d="M240,364 L240,385 L127,385 L127,412" class="line"/><path d="M240,385 L353,385 L353,412" class="line"/>
+<rect x="25" y="422" width="205" height="100" rx="8" fill="#e7e2d2" stroke="#b2c4be"/>
+<text x="127.5" y="448" text-anchor="middle" class="small">RSS much lower</text>
+<text x="127.5" y="471" text-anchor="middle" class="small">Other processes / cache</text>
+<text x="127.5" y="494" text-anchor="middle" class="small">tmpfs / kernel charges</text>
+<rect x="250" y="422" width="205" height="100" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="352.5" y="448" text-anchor="middle" class="small">RSS comparable</text>
+<text x="352.5" y="471" text-anchor="middle" class="small">Read smaps_rollup</text>
+<text x="352.5" y="494" text-anchor="middle" class="small">Inspect memory type</text>
+<path d="M352,522 L352,558" class="line"/>
+<rect x="250" y="568" width="205" height="100" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="352.5" y="594" text-anchor="middle" class="small">Anonymous-heavy</text>
+<text x="352.5" y="617" text-anchor="middle" class="small">V8 / native / caches</text>
+<rect x="25" y="568" width="205" height="100" rx="8" fill="#e7e2d2" stroke="#b2c4be"/>
+<text x="127.5" y="594" text-anchor="middle" class="small">File-backed-heavy</text>
+<text x="127.5" y="617" text-anchor="middle" class="small">Inspect mappings and</text>
+<text x="127.5" y="640" text-anchor="middle" class="small">cgroup file charges</text>
+<path d="M270,522 L270,543 L127,543 L127,558" class="line"/><path d="M352,668 L352,690 L240,690 L240,710" class="line"/>
+<rect x="25" y="720" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="748" text-anchor="middle" class="">Inspect runtime limits and headroom</text>
+<text x="240" y="771" text-anchor="middle" class="">Track heap, external memory, and RSS</text>
+<path d="M240,796 L240,822" class="line"/>
+<rect x="25" y="832" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="860" text-anchor="middle" class="">Observe equivalent workload windows</text>
+<text x="240" y="883" text-anchor="middle" class="">Compare baseline after major GC</text>
+<path d="M240,908 L240,927 L127,927 L127,948" class="line"/><path d="M240,927 L352,927 L352,948" class="line"/>
+<rect x="25" y="958" width="205" height="100" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="127.5" y="984" text-anchor="middle" class="small">Stable</text>
+<text x="127.5" y="1007" text-anchor="middle" class="small">Capacity / concurrency</text>
+<text x="127.5" y="1030" text-anchor="middle" class="small">Peak headroom</text>
+<rect x="250" y="958" width="205" height="100" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="352.5" y="984" text-anchor="middle" class="small">Continuously growing</text>
+<text x="352.5" y="1007" text-anchor="middle" class="small">Retention / cache / native</text>
+<text x="352.5" y="1030" text-anchor="middle" class="small">Snapshots + GC traces</text>
+<text x="240" y="1096" text-anchor="middle" class="small">Branches guide investigation; they are not verdicts.</text>
+<text x="240" y="1123" text-anchor="middle" class="small">A current snapshot cannot explain a past peak.</text>
+</svg>

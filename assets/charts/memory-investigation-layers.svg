@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 650" role="img" aria-labelledby="title desc"><title id="title">Memory investigation layers</title><desc id="desc">Move from Kubernetes evidence to cgroup charge, process mappings, runtime accounting, and application behavior.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#526777"/></marker></defs><style>text{font-family:system-ui,sans-serif;fill:#203c4a;font-size:17px}.title{font-size:21px;font-weight:700}.small{font-size:15px}.line{stroke:#526777;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<rect width="480" height="650" rx="12" fill="#f4f3ee"/>
+<text x="240" y="34" text-anchor="middle" class="title">Choose the right observation layer</text>
+<rect x="25" y="65" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="93" text-anchor="middle" class="">Kubernetes</text>
+<text x="240" y="116" text-anchor="middle" class="">describe · top · previous logs</text>
+<path d="M240,141 L240,168" class="line"/>
+<rect x="25" y="177" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="205" text-anchor="middle" class="">Container / cgroup</text>
+<text x="240" y="228" text-anchor="middle" class="">memory.current · max · stat · events</text>
+<path d="M240,253 L240,280" class="line"/>
+<rect x="25" y="289" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="317" text-anchor="middle" class="">Linux process</text>
+<text x="240" y="340" text-anchor="middle" class="">ps · status · smaps_rollup</text>
+<path d="M240,365 L240,392" class="line"/>
+<rect x="25" y="401" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="429" text-anchor="middle" class="">Node.js runtime</text>
+<text x="240" y="452" text-anchor="middle" class="">in-process RSS / heap / external</text>
+<path d="M240,477 L240,504" class="line"/>
+<rect x="25" y="513" width="430" height="76" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240" y="541" text-anchor="middle" class="">Next.js application</text>
+<text x="240" y="564" text-anchor="middle" class="">SSR · caches · images · retained state</text>
+<text x="240" y="635" text-anchor="middle" class="small">These metrics overlap; do not add them.</text>
+</svg>
