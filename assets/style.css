@@ -319,25 +319,6 @@ a:focus-visible {
 .leadership-strip strong { color: var(--ink); }
 .metric-note { margin: 18px 0 0 264px; color: var(--muted); font-size: 12px; }
 
-.experience-list { margin-left: 264px; border-top: 1px solid var(--line-strong); }
-.experience-row { padding-block: 31px; border-bottom: 1px solid var(--line); }
-.experience-row header { display: flex; align-items: flex-start; justify-content: space-between; gap: 26px; }
-.experience-row h3 { font-size: 23px; }
-.company { margin-top: 6px; color: var(--accent-strong); font-size: 14px; font-weight: 650; }
-.experience-row .date-range { padding-top: 4px; color: var(--muted); font: 12px/1.6 var(--mono); white-space: nowrap; }
-.experience-summary { max-width: 780px; margin-top: 16px; color: var(--muted); }
-.additional-roles { padding-block: 30px; border-bottom: 1px solid var(--line); }
-.additional-roles > .eyebrow { margin-bottom: 17px; color: var(--brass); }
-.additional-roles ul { padding: 0; list-style: none; }
-.additional-roles li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 28px; padding-block: 16px; border-top: 1px solid var(--line); }
-.additional-roles li div { display: grid; gap: 4px; }
-.additional-roles strong { font-size: 15px; }
-.additional-roles span { color: var(--muted); font-size: 14px; }
-.additional-roles time { color: var(--muted); font: 12px/1.6 var(--mono); white-space: nowrap; }
-.experience-footer { display: flex; align-items: center; justify-content: space-between; gap: 28px; padding-top: 24px; }
-.experience-footer > p { max-width: 580px; color: var(--muted); font-size: 12px; }
-.experience-footer .text-link { flex-shrink: 0; }
-
 .capability-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-left: 264px; }
 .capability-grid article { padding: 27px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); }
 .capability-grid article > span { color: var(--accent); font: 650 11px var(--mono); }
@@ -504,7 +485,7 @@ a:focus-visible {
   .hero h1 { font-size: clamp(3.45rem, 7vw, 5.15rem); }
   .profile { max-width: 370px; justify-self: end; }
   .section-heading { grid-template-columns: 170px 1fr; gap: 28px; }
-  .case-grid, .experience-list, .capability-grid { margin-left: 198px; }
+  .case-grid, .capability-grid { margin-left: 198px; }
   .metric-note { margin-left: 198px; }
   .case-featured-body { grid-template-columns: 1fr 1fr; gap: 30px; }
   .case-card-featured { padding: 32px; }
@@ -523,7 +504,7 @@ a:focus-visible {
 
 @media (max-width: 880px) {
   .site-header { min-height: 0; gap: 10px; padding-block: 14px; flex-wrap: wrap; }
-  .nav { width: 100%; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
+  .nav { width: 100%; display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
   .nav a { min-height: 44px; justify-content: center; padding-inline: 6px; font-size: 13px; }
   .hero {
     grid-template-columns: 1fr;
@@ -540,7 +521,7 @@ a:focus-visible {
   .profile figcaption { align-content: center; padding: 0; font-size: 12px; }
   .section-heading { grid-template-columns: 1fr; gap: 14px; }
   .section-heading .eyebrow { padding: 0; }
-  .case-grid, .experience-list, .capability-grid { margin-left: 0; }
+  .case-grid, .capability-grid { margin-left: 0; }
   .metric-note { margin-left: 0; }
   .case-featured-body { grid-template-columns: 1fr; }
   .case-scope { padding: 25px 0 0; border-top: 1px solid var(--dark-line); border-left: 0; }
@@ -569,10 +550,6 @@ a:focus-visible {
   .case-card-featured h3 { margin-top: 0; font-size: 34px; }
   .case-results { margin-top: 28px; }
   .case-card-featured .case-results-four { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .experience-row header { flex-direction: column; gap: 8px; }
-  .experience-row .date-range { padding: 0; }
-  .additional-roles li { grid-template-columns: 1fr; gap: 7px; }
-  .experience-footer { align-items: flex-start; flex-direction: column; gap: 12px; }
   .capability-grid { grid-template-columns: 1fr; }
   .capability-grid article:last-child { grid-column: auto; }
   .capability-grid p { min-height: 0; }
@@ -655,7 +632,7 @@ a:focus-visible {
   .section { padding: 20px 0; }
   .section-heading { grid-template-columns: 145px 1fr; gap: 18px; margin-bottom: 18px; }
   .section-heading h2 { font-size: 25px; }
-  .case-grid, .experience-list, .capability-grid { margin-left: 163px; }
+  .case-grid, .capability-grid { margin-left: 163px; }
   .case-card { break-inside: avoid; }
   .case-featured-body, .case-supporting { grid-template-columns: 1fr; }
   .case-card-featured .case-results-four { grid-template-columns: repeat(4, 1fr); }
