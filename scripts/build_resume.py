@@ -198,7 +198,7 @@ def build():
         leftMargin=18 * mm,
         topMargin=12 * mm,
         bottomMargin=17 * mm,
-        title="Hossein Moazami - Senior DevOps and Platform Engineer",
+        title="Hossein Moazami - DevOps and Platform Engineer",
         author="Hossein Moazami",
         subject="Professional resume",
         keywords="DevOps, Platform Engineering, Kubernetes, Terraform, Ansible, CI/CD, Observability",
@@ -206,7 +206,7 @@ def build():
 
     story = [
         paragraph("Hossein Moazami", styles["name"]),
-        paragraph("Senior DevOps &amp; Platform Engineer", styles["headline"]),
+        paragraph("DevOps &amp; Platform Engineer", styles["headline"]),
         paragraph(
             "Tehran, Iran &nbsp;|&nbsp; "
             '<link href="tel:+989371942700" color="#244F73">+98 937 194 2700</link> &nbsp;|&nbsp; '
