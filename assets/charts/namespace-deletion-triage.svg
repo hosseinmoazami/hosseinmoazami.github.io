@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 950" role="img" aria-labelledby="title desc"><title id="title">Namespace deletion triage</title><desc id="desc">Inspect conditions and API availability. Failed discovery means unknown inventory. With complete discovery, inspect remaining objects and controllers; only consider namespace finalization after cleanup and risk review.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#526777"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;fill:#203c4a;font-size:17px}.title{font-size:21px;font-weight:700}.small{font-size:15px}.line{stroke:#526777;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<rect width="480" height="950" rx="12" fill="#f4f3ee"/>
+<text x="240" y="34" text-anchor="middle" class="title">Namespace stuck in Terminating</text>
+<rect x="30" y="60" width="420" height="80" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="87" text-anchor="middle" class="">Read namespace conditions</text>
+<text x="240.0" y="110" text-anchor="middle" class="">Check discovery and API errors</text>
+<path d="M240,140 L240,165 L125,165 L125,190" class="line"/>
+<path d="M240,165 L355,165 L355,190" class="line"/>
+<rect x="20" y="200" width="210" height="104" rx="8" fill="#f1e0d9" stroke="#b2c4be"/>
+<text x="125.0" y="227" text-anchor="middle" class="small">API errors present</text>
+<text x="125.0" y="250" text-anchor="middle" class="small">Inventory is incomplete</text>
+<text x="125.0" y="273" text-anchor="middle" class="small">Repair APIs; rescan</text>
+<rect x="250" y="200" width="210" height="104" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="355.0" y="227" text-anchor="middle" class="small">Discovery succeeds</text>
+<text x="355.0" y="250" text-anchor="middle" class="small">List every namespaced</text>
+<text x="355.0" y="273" text-anchor="middle" class="small">resource type</text>
+<path d="M355,304 L355,336 L240,336 L240,366" class="line"/>
+<rect x="30" y="376" width="420" height="80" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="403" text-anchor="middle" class="">Any list errors?</text>
+<text x="240.0" y="426" text-anchor="middle" class="">Resolve them before claiming empty</text>
+<path d="M240,456 L240,480 L125,480 L125,512" class="line"/>
+<path d="M240,480 L355,480 L355,512" class="line"/>
+<rect x="20" y="522" width="210" height="104" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="125.0" y="549" text-anchor="middle" class="small">Objects remain</text>
+<text x="125.0" y="572" text-anchor="middle" class="small">Inspect finalizers</text>
+<text x="125.0" y="595" text-anchor="middle" class="small">Check controller</text>
+<rect x="250" y="522" width="210" height="104" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="355.0" y="549" text-anchor="middle" class="small">No objects found</text>
+<text x="355.0" y="572" text-anchor="middle" class="small">Check namespace</text>
+<text x="355.0" y="595" text-anchor="middle" class="small">finalization state</text>
+<path d="M125,626 L125,662" class="line"/>
+<path d="M355,626 L355,662" class="line"/>
+<rect x="20" y="672" width="210" height="104" rx="8" fill="#e7e2d2" stroke="#b2c4be"/>
+<text x="125.0" y="699" text-anchor="middle" class="small">Restore normal cleanup</text>
+<text x="125.0" y="722" text-anchor="middle" class="small">or deliberately bypass</text>
+<text x="125.0" y="745" text-anchor="middle" class="small">one reviewed obligation</text>
+<rect x="250" y="672" width="210" height="104" rx="8" fill="#f1e0d9" stroke="#b2c4be"/>
+<text x="355.0" y="699" text-anchor="middle" class="small">Last resort: /finalize</text>
+<text x="355.0" y="722" text-anchor="middle" class="small">Accept orphan risk</text>
+<text x="355.0" y="745" text-anchor="middle" class="small">Verify all storage</text>
+<text x="240" y="823" text-anchor="middle" class="">After object cleanup: repeat the inventory.</text>
+<text x="240" y="861" text-anchor="middle" class="">After forced finalization: API absence is not</text>
+<text x="240" y="887" text-anchor="middle" class="">proof that external storage was removed.</text>
+<text x="240" y="926" text-anchor="middle" class="small">Never interpret failed queries as empty results.</text>
+</svg>

@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A command-first runbook for namespace deletion, PVC protection, Longhorn finalizers, and deliberate storage cleanup.">
+  <meta name="author" content="Hossein Moazami">
+  <meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/blog/posts/kubernetes-namespace-and-pvc-stuck-terminating-cleanup.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Kubernetes Namespace and PVC Deletion Runbook">
+  <meta property="og:description" content="A command-first runbook for namespace deletion, PVC protection, Longhorn finalizers, and deliberate storage cleanup.">
+  <meta property="og:url" content="https://hossein.cloud/blog/posts/kubernetes-namespace-and-pvc-stuck-terminating-cleanup.html">
+  <meta property="og:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Hossein Moazami — DevOps and Platform Engineer">
+  <meta property="article:published_time" content="2026-10-11">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Kubernetes Namespace and PVC Deletion Runbook">
+  <meta name="twitter:description" content="A command-first runbook for namespace deletion, PVC protection, Longhorn finalizers, and deliberate storage cleanup.">
+  <meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta name="twitter:image:alt" content="Hossein Moazami — DevOps and Platform Engineer">
+  <!-- PAGE_TITLE: concise browser/share title; TITLE: full article headline. -->
+  <title>Kubernetes Namespace and PVC Deletion Runbook — Hossein Moazami</title>
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32">
+  <link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml">
+  <link rel="stylesheet" href="../../assets/style.css?v=a522849802df">
+  <script src="../../assets/article-toc.js?v=0809d5e33473" defer></script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Kubernetes Namespace and PVC Stuck in Terminating — Cleanup Runbook","datePublished":"2026-10-11","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/kubernetes-namespace-and-pvc-stuck-terminating-cleanup.html","image":"https://hossein.cloud/assets/og-card.png","description":"A command-first runbook for namespace deletion, PVC protection, Longhorn finalizers, and deliberate storage cleanup."}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a>
+    <nav class="nav" aria-label="Main navigation"><a href="/#work">Work</a><a href="/blog/" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="/#contact">Contact</a></nav>
+  </header>
+  <main id="main" class="article-shell article-shell--toc">
+    <a class="back-link" href="/blog/"><span aria-hidden="true">←</span> All field notes</a>
+    <article class="article-layout--toc">
+      <header class="article-header"><div class="post-meta"><span class="post-tag">Kubernetes</span><time datetime="2026-10-11">October 11, 2026</time><span aria-hidden="true">/</span><span>12 min read</span></div><h1>Kubernetes Namespace and PVC Stuck in Terminating — Cleanup Runbook</h1><p class="article-lead">A command-first runbook for namespace deletion, PVC protection, Longhorn finalizers, and deliberate storage cleanup.</p><p class="article-byline">By Hossein Moazami · DevOps &amp; Platform Engineer</p></header>
+      <aside class="article-toc" aria-label="Table of contents" data-article-toc>
+        <details open>
+          <summary><span id="toc-title" class="article-toc-title">Jump to</span><span class="article-toc-count">12 sections</span><span class="article-toc-icon" aria-hidden="true"></span></summary>
+          <nav class="article-toc-nav" aria-labelledby="toc-title">
+            <ol class="article-toc-list">
+              <li><a href="#symptoms">Symptoms and First Checks</a></li>
+              <li><a href="#inspect-namespace">Inspect the Namespace</a></li>
+              <li><a href="#remaining-resources">Find Remaining Namespaced Resources</a></li>
+              <li><a href="#resource-finalizers">Understand and Inspect Resource Finalizers</a></li>
+              <li><a href="#longhorn">Longhorn-Specific Cleanup</a></li>
+              <li><a href="#storage-relationships">Trace the Storage Before Deleting PVCs</a></li>
+              <li><a href="#delete-pvc">Delete PersistentVolumeClaims Normally</a></li>
+              <li><a href="#pvc-protection">PVC Stuck in Terminating</a></li>
+              <li><a href="#remove-resource-finalizers">Remove Finalizers From Individual Resources</a></li>
+              <li><a href="#finalize-namespace">Force Namespace Finalization Last</a></li>
+              <li><a href="#verify-cleanup">Verify Cleanup at Every Layer</a></li>
+              <li><a href="#quick-reference">Quick Command Reference</a></li>
+            </ol>
+            <a class="article-toc-top" href="#main">Back to top <span aria-hidden="true">↑</span></a>
+          </nav>
+        </details>
+      </aside>
+      <div class="article-body">
+        <h2 id="symptoms">Symptoms and First Checks</h2>
+
+        <p>Use this runbook when a namespace or PVC stays in <code>Terminating</code>. Start with read-only inspection. A successful delete request does not mean that controller cleanup has finished.</p>
+
+        <pre tabindex="0" aria-label="Example namespace state"><code class="language-text">NAME       STATUS        AGE
+longhorn   Terminating   3d</code></pre>
+
+        <p>Commands run on an administrative workstation with <code>kubectl</code>, <code>jq</code>, and Bash. Replace quoted placeholders before copying. The namespace <code>longhorn</code> is an example; many installations use <code>longhorn-system</code>. Application PVCs may be in entirely different namespaces.</p>
+
+        <pre tabindex="0" aria-label="Confirm target context and namespace"><code class="language-bash">kubectl config current-context
+kubectl get namespace longhorn
+kubectl describe namespace longhorn</code></pre>
+
+        <p>Confirm the intended cluster and namespace. The description includes conditions identifying failed discovery, remaining content, or finalizers. Do not start with <code>--force</code>: it does not automatically clear finalizers. Before destructive cleanup, stop dependent workloads and establish whether the data must be retained or can be destroyed.</p>
+
+        <h2 id="inspect-namespace">1. Inspect the Namespace</h2>
+
+        <pre tabindex="0" aria-label="Inspect namespace deletion and controller conditions"><code class="language-bash">kubectl get namespace longhorn -o yaml
+kubectl get namespace longhorn -o json | jq &#x27;.spec.finalizers&#x27;
+kubectl get namespace longhorn -o json | jq &#x27;{
+  deletionTimestamp: .metadata.deletionTimestamp,
+  namespaceFinalizers: .spec.finalizers,
+  conditions: .status.conditions
+}&#x27;</code></pre>
+
+        <p>A timestamp means deletion has already been requested. <code>spec.finalizers</code> commonly contains <code>kubernetes</code> while the namespace controller discovers and deletes namespaced content. Read each condition’s <code>status</code>, <code>reason</code>, and <code>message</code>; these are more useful than the phase alone.</p>
+
+        <div class="reference-table" role="region" aria-label="Namespace deletion conditions" tabindex="0"><table><thead><tr><th scope="col">Signal</th><th scope="col">Investigate</th></tr></thead><tbody><tr><td><code>NamespaceDeletionDiscoveryFailure</code></td><td>Unavailable API groups or discovery errors.</td></tr><tr><td><code>NamespaceDeletionContentFailure</code></td><td>A failed delete, authorization issue, or webhook/controller error.</td></tr><tr><td><code>NamespaceContentRemaining</code></td><td>Objects still exist; enumerate them.</td></tr><tr><td><code>NamespaceFinalizersRemaining</code></td><td>Remaining objects have cleanup obligations.</td></tr></tbody></table></div>
+
+        <p>For an API discovery failure, inspect aggregated API availability:</p>
+
+        <pre tabindex="0" aria-label="Investigate unavailable aggregated APIs"><code class="language-bash">kubectl get apiservice
+kubectl describe apiservice &#x27;&lt;api-service-name&gt;&#x27;</code></pre>
+
+        <p>An <code>Available=False</code> service is a lead. Restore the owning extension, service endpoints, or certificates as appropriate; do not delete API registrations just to hide the error. A successful APIService check does not rule out CRD conversion or other discovery failures.</p>
+
+        <h2 id="remaining-resources">2. Find Remaining Namespaced Resources</h2>
+
+        <p><code>kubectl get all</code> does not include every resource type. This read-only scan discovers listable namespaced APIs, prints object names, and keeps errors separate. Run it in Bash:</p>
+
+        <pre tabindex="0" aria-label="List resources without hiding failed API queries"><code class="language-bash">scan_namespace() {
+  local namespace=&quot;${1:?namespace required}&quot;
+  local resource discovered objects failed=0
+  if discovered=$(kubectl api-resources --verbs=list --namespaced -o name --request-timeout=15s); then
+    :
+  else
+    printf &#x27;Discovery failed; any inventory below is incomplete.\n&#x27; &gt;&amp;2
+    failed=1
+  fi
+  while IFS= read -r resource; do
+    [ -n &quot;$resource&quot; ] || continue
+    if objects=$(kubectl get &quot;$resource&quot; -n &quot;$namespace&quot; -o name --request-timeout=15s); then
+      if [ -n &quot;$objects&quot; ]; then
+        printf &#x27;\n[%s]\n%s\n&#x27; &quot;$resource&quot; &quot;$objects&quot;
+      fi
+    else
+      printf &#x27;FAILED to list %s; do not treat it as empty.\n&#x27; &quot;$resource&quot; &gt;&amp;2
+      failed=1
+    fi
+  done &lt;&lt;&lt; &quot;$discovered&quot;
+  return &quot;$failed&quot;
+}
+scan_namespace longhorn</code></pre>
+
+        <p>Object names identify what remains. No object output means only that the successfully queried types were empty. A nonzero exit status, timeout, Forbidden response, or discovery warning makes the inventory incomplete. Fix those errors and repeat before finalizing the namespace. The scan lists names rather than exporting Secret contents.</p>
+
+        <figure class="memory-figure"><a href="../../assets/charts/namespace-deletion-triage.svg" aria-label="Open full-size diagram: Namespace deletion troubleshooting decision tree"><img width="480" height="950" src="../../assets/charts/namespace-deletion-triage.svg" alt="Namespace deletion troubleshooting decision tree" loading="lazy"></a><figcaption>A failed API query is an unknown result, not evidence that the namespace is empty.</figcaption></figure>
+
+        <h2 id="resource-finalizers">3. Understand and Inspect Resource Finalizers</h2>
+
+        <pre tabindex="0" aria-label="Inspect one remaining object"><code class="language-bash">kubectl get &#x27;&lt;resource-type&gt;&#x27; &#x27;&lt;resource-name&gt;&#x27; -n longhorn -o yaml
+kubectl get &#x27;&lt;resource-type&gt;&#x27; &#x27;&lt;resource-name&gt;&#x27; -n longhorn -o json |
+  jq &#x27;{deletionTimestamp: .metadata.deletionTimestamp, finalizers: .metadata.finalizers}&#x27;</code></pre>
+
+        <p>Expect a deletion timestamp and one or more finalizer keys on a blocked object. A controller normally removes its key after fulfilling its cleanup contract. Removing a key manually skips that contract; it does not execute the cleanup. Once deletion starts, removing a finalizer does not undo the deletion request. See the <a href="https://kubernetes.io/docs/concepts/overview/working-with-objects/finalizers/">Kubernetes finalizer reference</a>.</p>
+
+        <pre tabindex="0" aria-label="Example PVC metadata"><code class="language-yaml">metadata:
+  finalizers:
+    - kubernetes.io/pvc-protection</code></pre>
+
+        <div class="reference-table" role="region" aria-label="Deletion fields and obligations" tabindex="0"><table><thead><tr><th scope="col">Field / mechanism</th><th scope="col">Meaning</th></tr></thead><tbody><tr><td><code>metadata.deletionTimestamp</code></td><td>Deletion requested; not a cleanup-complete marker.</td></tr><tr><td><code>metadata.finalizers</code></td><td>Cleanup or protection keys on ordinary resources.</td></tr><tr><td><code>spec.finalizers</code> on Namespace</td><td>Namespace-specific finalization; managed through the finalize subresource.</td></tr><tr><td>PVC protection</td><td>Prevents removal while a claim is in use; it is not backend volume cleanup.</td></tr></tbody></table></div>
+
+        <p>Check the relevant controller before patching. For a custom controller, inspect its Pods, then read the selected controller’s logs:</p>
+
+        <pre tabindex="0" aria-label="Inspect the controller responsible for cleanup"><code class="language-bash">kubectl get pods -n &#x27;&lt;controller-namespace&gt;&#x27;
+kubectl logs -n &#x27;&lt;controller-namespace&gt;&#x27; &#x27;&lt;controller-pod&gt;&#x27; \
+  -c &#x27;&lt;container-name&gt;&#x27; --tail=100</code></pre>
+
+        <p>Look for failed reconciliation, missing permissions, unavailable dependencies, or webhook failures. For built-in namespace/PVC protection controllers, use control-plane diagnostics or your managed provider’s support path; they may not be visible as ordinary workload Pods.</p>
+
+        <figure class="memory-figure"><a href="../../assets/charts/kubernetes-finalizer-cleanup.svg" aria-label="Open full-size diagram: Normal finalization versus manually bypassed cleanup"><img width="480" height="875" src="../../assets/charts/kubernetes-finalizer-cleanup.svg" alt="Normal finalization versus manually bypassed cleanup" loading="lazy"></a><figcaption>For an ordinary object, all finalizers must clear and any applicable grace period must finish. API removal alone does not establish that backend cleanup succeeded.</figcaption></figure>
+
+        <h2 id="longhorn">4. Longhorn-Specific Cleanup</h2>
+
+        <p>Prefer the <a href="https://longhorn.io/docs/1.13.0/deploy/uninstall/">official Longhorn uninstall procedure</a>, selecting documentation and manifests for the installed version and deployment method. Keep cleanup controllers available until their work is complete. Longhorn’s uninstall confirmation setting protects against accidental data loss; intentionally enabling it permits uninstall, rather than fixing an arbitrary stuck resource.</p>
+
+        <pre tabindex="0" aria-label="Discover Longhorn APIs and uninstall state"><code class="language-bash">kubectl api-resources --api-group=longhorn.io --namespaced -o name
+kubectl get pods,jobs -n longhorn
+kubectl get settings.longhorn.io deleting-confirmation-flag -n longhorn -o yaml</code></pre>
+
+        <p>The first command lists available types, which can include <code>volumes.longhorn.io</code>, <code>engines.longhorn.io</code>, <code>replicas.longhorn.io</code>, and <code>settings.longhorn.io</code>. Their existence alone is not proof that they are blocking deletion. Use the namespace scan, then inspect the exact remaining instances and their finalizers. A missing setting or failed discovery is diagnostic evidence, not a reason to create guessed objects.</p>
+
+        <p>For an existing uninstall Job, inspect its status and logs:</p>
+
+        <pre tabindex="0" aria-label="Inspect an existing uninstall job"><code class="language-bash">kubectl describe job &#x27;&lt;uninstall-job-name&gt;&#x27; -n longhorn
+kubectl logs job/&#x27;&lt;uninstall-job-name&gt;&#x27; -n longhorn --all-containers=true --tail=100</code></pre>
+
+        <p>Expect completion or a concrete failure such as an unset confirmation flag or failed API call. If the namespace is already terminating, Kubernetes normally rejects creation of new namespaced objects, including a new uninstall Job. Do not assume reinstalling into that namespace will restore cleanup. Use a version-specific recovery plan.</p>
+
+        <p>If a patch fails because a Longhorn admission or conversion webhook is unavailable, inspect the reported webhook and its service. Do not remove cluster-wide webhooks indiscriminately. Manual Longhorn finalizer removal is reserved here for intentional teardown where data loss and orphaned replicas are accepted. Removing CRDs first can erase access to the very records needed to reconcile storage.</p>
+
+        <h2 id="storage-relationships">5. Trace the Storage Before Deleting PVCs</h2>
+
+        <figure class="memory-figure"><a href="../../assets/charts/kubernetes-storage-deletion.svg" aria-label="Open full-size diagram: Pod, PVC, PV, CSI and Longhorn storage relationships"><img width="480" height="950" src="../../assets/charts/kubernetes-storage-deletion.svg" alt="Pod, PVC, PV, CSI and Longhorn storage relationships" loading="lazy"></a><figcaption>StorageClass supplies provisioning policy; it is not a data-path hop. PVCs are namespaced, while PVs and StorageClasses are cluster-scoped. Backend replicas can survive removal of API records.</figcaption></figure>
+
+        <p>Record the bound PV, its reclaim policy, and the CSI volume handle before the claim disappears. These commands inspect one claim and its associated storage:</p>
+
+        <pre tabindex="0" aria-label="Inspect claim binding, reclaim policy and CSI identity"><code class="language-bash">kubectl get pvc &#x27;&lt;pvc-name&gt;&#x27; -n &#x27;&lt;namespace&gt;&#x27; -o wide
+kubectl get pvc &#x27;&lt;pvc-name&gt;&#x27; -n &#x27;&lt;namespace&gt;&#x27; -o jsonpath=&#x27;{.spec.volumeName}{&quot;\n&quot;}&#x27;
+kubectl get pv &#x27;&lt;pv-name&gt;&#x27; -o json | jq &#x27;{
+  claim: .spec.claimRef, reclaimPolicy: .spec.persistentVolumeReclaimPolicy,
+  storageClass: .spec.storageClassName, csi: .spec.csi,
+  finalizers: .metadata.finalizers
+}&#x27;
+kubectl get storageclass &#x27;&lt;storage-class-name&gt;&#x27; -o yaml</code></pre>
+
+        <p>Use the returned PV name in the next command. An unbound claim may have no PV. The StorageClass identifies the provisioner and provisioning defaults; inspect the existing PV’s policy rather than assuming the current StorageClass value controls it. Keep the real volume handle in private incident notes, not a public post.</p>
+
+        <p><code>Delete</code> normally asks the storage implementation to delete the backing asset when the PV is reclaimed. <code>Retain</code> leaves storage for deliberate recovery or disposal. PVC protection and PV/CSI deletion finalizers solve different problems. See <a href="https://kubernetes.io/docs/concepts/storage/persistent-volumes/">persistent volume lifecycle and protection</a>.</p>
+
+        <h2 id="delete-pvc">6. Delete PersistentVolumeClaims Normally</h2>
+
+        <p><strong>Destructive:</strong> claim deletion can cause permanent backend data deletion under a Delete reclaim policy. Stop consumers and verify any required backup or retention plan first. List the target scope, then delete one reviewed claim:</p>
+
+        <pre tabindex="0" aria-label="List claims and request one PVC deletion"><code class="language-bash">kubectl get pvc -n &#x27;&lt;namespace&gt;&#x27;
+kubectl delete pvc &#x27;&lt;pvc-name&gt;&#x27; -n &#x27;&lt;namespace&gt;&#x27; --wait=false</code></pre>
+
+        <p><code>--wait=false</code> returns after the request is accepted; it does not bypass protection. Follow with <code>kubectl get pvc</code>: the claim may disappear or remain terminating while its obligations are resolved. Omitting that option makes kubectl wait by default.</p>
+
+        <p>Only for an intentionally disposable namespace, this requests deletion of <strong>every PVC</strong> in that namespace:</p>
+
+        <pre tabindex="0" aria-label="Destructive: request deletion of every claim in one namespace"><code class="language-bash">kubectl delete pvc --all -n &#x27;&lt;namespace&gt;&#x27; --wait=false</code></pre>
+
+        <p>Expect deletion requests for all listed claims, with the same data-loss and finalizer behavior as single-claim deletion. Do not substitute the Longhorn controller namespace for an application namespace without checking where the claims actually live.</p>
+
+        <h2 id="pvc-protection">7. PVC Stuck in Terminating</h2>
+
+        <pre tabindex="0" aria-label="Inspect PVC protection and events"><code class="language-bash">kubectl get pvc &#x27;&lt;pvc-name&gt;&#x27; -n &#x27;&lt;namespace&gt;&#x27; -o yaml
+kubectl describe pvc &#x27;&lt;pvc-name&gt;&#x27; -n &#x27;&lt;namespace&gt;&#x27;</code></pre>
+
+        <p>If <code>kubernetes.io/pvc-protection</code> remains, look for Pod references before touching it. Protection is about use by Pod objects, not merely whether a process is currently reading a mounted filesystem. This query includes all Pod phases and shows deletion state:</p>
+
+        <pre tabindex="0" aria-label="Find Pod objects that reference the claim"><code class="language-bash">kubectl get pods -n &#x27;&lt;namespace&gt;&#x27; -o json |
+  jq -r --arg claim &#x27;&lt;pvc-name&gt;&#x27; &#x27;
+    .items[]
+    | select(any(.spec.volumes[]?; .persistentVolumeClaim.claimName == $claim))
+    | [.metadata.name, .status.phase, (.metadata.deletionTimestamp // &quot;not deleting&quot;)]
+    | @tsv&#x27;</code></pre>
+
+        <p>Rows identify consumers to investigate, including terminating Pods. Stop their owning workload or reconciliation loop so replacement Pods are not created, then let normal protection removal run. Empty output only establishes that this successful query found no explicit PVC references at that instant; verify detach/unmount state and controller health as well. A force-deleted Pod may have left work running on an unreachable node.</p>
+
+        <p>For an intentional destructive cleanup, after consumers are stopped and storage consequences are accepted, the following clears <strong>all</strong> finalizers on this one PVC:</p>
+
+        <pre tabindex="0" aria-label="Destructive: bypass all finalizers on one terminating PVC"><code class="language-bash">kubectl patch pvc &#x27;&lt;pvc-name&gt;&#x27; -n &#x27;&lt;namespace&gt;&#x27; \
+  --type=merge -p &#x27;{&quot;metadata&quot;: {&quot;finalizers&quot;: []} }&#x27;
+kubectl get pvc &#x27;&lt;pvc-name&gt;&#x27; -n &#x27;&lt;namespace&gt;&#x27;</code></pre>
+
+        <p>Expect a patch acknowledgment followed eventually by NotFound if deletion was already requested and no other blocker remains. If it was not marked for deletion, clearing finalizers alone does not delete it. Review every key first; this patch removes more than just PVC protection when other keys exist. A narrower manual alternative is:</p>
+
+        <pre tabindex="0" aria-label="Manually edit only the reviewed PVC finalizer"><code class="language-bash">kubectl edit pvc &#x27;&lt;pvc-name&gt;&#x27; -n &#x27;&lt;namespace&gt;&#x27;</code></pre>
+
+        <p>Remove only the finalizer entry whose obligation you have explicitly resolved or chosen to bypass, then save. Do not remove unrelated entries or the deletion timestamp. Neither editing nor patching proves the volume has been cleaned up.</p>
+
+        <h2 id="remove-resource-finalizers">8. Remove Finalizers From Individual Resources</h2>
+
+        <p>If the responsible controller cannot finish and this resource is intentionally being destroyed, record its identity and cleanup obligations before applying a targeted patch. This example clears all metadata finalizers on <strong>one reviewed object</strong>:</p>
+
+        <pre tabindex="0" aria-label="Destructive: bypass finalizers on one remaining object"><code class="language-bash">kubectl patch &#x27;&lt;resource-type&gt;&#x27; &#x27;&lt;resource-name&gt;&#x27; -n longhorn \
+  --type=merge -p &#x27;{&quot;metadata&quot;: {&quot;finalizers&quot;: []} }&#x27;
+kubectl get &#x27;&lt;resource-type&gt;&#x27; &#x27;&lt;resource-name&gt;&#x27; -n longhorn</code></pre>
+
+        <p>A terminating object may then disappear; re-run the inventory. This affects <code>metadata.finalizers</code> on the object, not the namespace’s <code>spec.finalizers</code>. Longhorn volume, engine, and replica cleanup can be bypassed, leaving storage artifacts or losing their tracking records. Do not turn this example into a blanket patch loop across every CR or CRD.</p>
+
+        <h2 id="finalize-namespace">9. Force Namespace Finalization Last</h2>
+
+        <p>Use this only after resolving discovery failures, reviewing remaining objects, and accepting any orphaned resources. <strong>The namespace may disappear while namespaced orphan objects, cluster-scoped objects, or backend storage remain.</strong> Ordinary namespace patching does not reliably update its dedicated finalization state; use the <code>/finalize</code> subresource. Kubernetes documents the orphaning risk in its <a href="https://kubernetes.io/blog/2021/05/14/using-finalizers-to-control-deletion/#forcing-a-deletion-of-a-namespace">namespace finalization example</a>.</p>
+
+        <p>Save a private copy, then generate a separate payload that changes only <code>spec.finalizers</code>:</p>
+
+        <pre tabindex="0" aria-label="Prepare and inspect the namespace finalization payload"><code class="language-bash">kubectl get namespace longhorn -o json &gt; longhorn-ns.json
+jq &#x27;.spec.finalizers = []&#x27; longhorn-ns.json &gt; longhorn-ns-finalize.json
+jq &#x27;{name: .metadata.name, uid: .metadata.uid, spec: .spec}&#x27; longhorn-ns-finalize.json</code></pre>
+
+        <p>The original file remains available for investigation; it is not a backup of namespace contents or storage. Check that the name is exactly the intended namespace. The relevant payload fragment is:</p>
+
+        <pre tabindex="0" aria-label="Edited fragment within the full Namespace JSON"><code class="language-json">&quot;spec&quot;: {
+  &quot;finalizers&quot;: []
+}</code></pre>
+
+        <p>Submit the full generated object, not just the fragment:</p>
+
+        <pre tabindex="0" aria-label="Destructive: force namespace finalization through its subresource"><code class="language-bash">kubectl replace --raw &quot;/api/v1/namespaces/longhorn/finalize&quot; \
+  -f longhorn-ns-finalize.json</code></pre>
+
+        <p>Expect an API response containing the updated Namespace, then verify deletion separately. Authorization, conflicts, or other API errors are not success; resolve them and fetch a fresh object before retrying. This uses kubectl’s configured authentication without exposing credentials or starting an unauthenticated proxy.</p>
+
+        <p>The command below is shown for comparison, <strong>not as a finalizer fix</strong>:</p>
+
+        <pre tabindex="0" aria-label="Comparison only: force delete does not clear namespace finalizers"><code class="language-bash">kubectl delete namespace longhorn --force --grace-period=0</code></pre>
+
+        <p>Changing grace-period handling does not fulfill finalizer obligations. Do not interpret a “deleted” message as proof of complete storage cleanup.</p>
+
+        <h2 id="verify-cleanup">10. Verify Cleanup at Every Layer</h2>
+
+        <pre tabindex="0" aria-label="Verify namespace, claims and cluster-scoped leftovers"><code class="language-bash">kubectl get ns longhorn
+kubectl get pv
+kubectl get pvc -A
+kubectl get volumeattachments.storage.k8s.io
+kubectl get crd -o name | grep &#x27;\.longhorn\.io$&#x27;
+kubectl get storageclass,csidriver
+kubectl get clusterrole,clusterrolebinding
+kubectl get validatingwebhookconfiguration,mutatingwebhookconfiguration</code></pre>
+
+        <p>NotFound for the namespace confirms API removal only. Review PVs for retained or terminating entries, PVCs in other namespaces, and VolumeAttachments for the recorded PVs. No matching CRD output means no matching definitions were listed, provided the kubectl request succeeded; it says nothing about on-disk replicas.</p>
+
+        <p>For a complete Longhorn uninstall, compare cluster-scoped objects against the actual release inventory and installed-version manifests. Inspect labels, ownership, and webhook service references; names alone are insufficient to decide deletion. Do not delete shared RBAC, StorageClasses, or webhook configurations by a broad substring match.</p>
+
+        <p>If a Longhorn CRD is stuck terminating, inspect the definition separately:</p>
+
+        <pre tabindex="0" aria-label="Inspect finalizers on a cluster-scoped CRD definition"><code class="language-bash">kubectl get crd &#x27;&lt;resource-type&gt;.longhorn.io&#x27; -o yaml</code></pre>
+
+        <p>Its <code>metadata.finalizers</code> can reflect custom-resource deletion work. Removing them is not equivalent to clearing an individual Longhorn CR’s finalizer and can leave orphan instances. Deleting a CRD removes its API and stored custom resources; it does not guarantee external data removal. Finish by verifying volumes, attachments, replica storage, and any backup-retention obligations through the storage system’s supported tools. API absence alone is not a complete uninstall criterion.</p>
+
+        <h2 id="quick-reference">11. Quick Command Reference</h2>
+
+        <p>Replace placeholders and keep the scope explicit. Commands marked destructive require the checks in their linked section.</p>
+
+        <div class="reference-table" role="region" aria-label="Namespace and PVC cleanup cheat sheet" tabindex="0"><table><thead><tr><th scope="col">Task</th><th scope="col">Command / section</th><th scope="col">Expected result</th></tr></thead><tbody><tr><td>Inspect namespace</td><td><code>kubectl describe ns longhorn</code></td><td>Deletion conditions and blockers.</td></tr><tr><td>Find remaining resources</td><td><a href="#remaining-resources">Define and run <code>scan_namespace longhorn</code></a></td><td>Names plus visible API errors.</td></tr><tr><td>Inspect finalizers</td><td><code>kubectl get '&lt;resource-type&gt;' '&lt;resource-name&gt;' -n longhorn -o yaml</code></td><td>Timestamp and metadata keys.</td></tr><tr><td>Delete PVC — destructive</td><td><code>kubectl delete pvc '&lt;pvc-name&gt;' -n '&lt;namespace&gt;' --wait=false</code></td><td>Deletion requested; may remain terminating.</td></tr><tr><td>Remove PVC finalizers — destructive</td><td><a href="#pvc-protection">Reviewed PVC patch or edit</a></td><td>Protection bypassed, not storage cleanup.</td></tr><tr><td>Remove resource finalizers — destructive</td><td><a href="#remove-resource-finalizers">Single-resource metadata patch</a></td><td>Chosen obligations bypassed.</td></tr><tr><td>Finalize namespace — destructive</td><td><a href="#finalize-namespace">Prepare JSON and PUT through <code>/finalize</code></a></td><td>Namespace finalization state updated.</td></tr><tr><td>Verify cleanup</td><td><code>kubectl get ns longhorn</code>; <code>kubectl get pv</code>; <code>kubectl get pvc -A</code></td><td>Check API objects, then backend storage.</td></tr></tbody></table></div>
+
+        <p>The useful stopping condition is not merely “the namespace vanished.” It is that the intended resources are gone, required data is preserved or deliberately destroyed, and no unexplained storage or controller obligations remain.</p>
+      </div>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="/#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="/#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <a class="article-next" href="troubleshooting-kubernetes-memory-and-nodejs-oomkills.html"><span><small>Continue reading</small><strong>Troubleshooting High Memory Usage and OOMKilled Pods in Kubernetes</strong></span><span aria-hidden="true">→</span></a>
+    </article>
+  </main>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="/">Home</a><a href="https://github.com/hosseinmoazami" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:hossein.moazami.goodarzi@gmail.com">Email</a></div></footer>
+</body>
+</html>

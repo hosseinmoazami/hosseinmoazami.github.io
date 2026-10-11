@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 950" role="img" aria-labelledby="title desc"><title id="title">Kubernetes and Longhorn storage relationships</title><desc id="desc">A namespaced Pod uses a PVC bound to a cluster-scoped PV. A StorageClass supplies provisioning configuration to CSI. The PV CSI handle identifies the Longhorn volume, which is backed by replica storage. StorageClass is not in the application data path.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#526777"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;fill:#203c4a;font-size:17px}.title{font-size:21px;font-weight:700}.small{font-size:15px}.line{stroke:#526777;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<rect width="480" height="950" rx="12" fill="#f4f3ee"/>
+<text x="240" y="34" text-anchor="middle" class="title">Follow the claim to its backing data</text>
+<rect x="30" y="60" width="420" height="80" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="87" text-anchor="middle" class="">Pod → PVC</text>
+<text x="240.0" y="110" text-anchor="middle" class="">Same application namespace</text>
+<path d="M240,140 L240,185" class="line"/>
+<text x="330" y="167" text-anchor="middle" class="small">claim binding</text>
+<rect x="30" y="195" width="420" height="80" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="222" text-anchor="middle" class="">PersistentVolume (cluster-scoped)</text>
+<text x="240.0" y="245" text-anchor="middle" class="">Reclaim policy + CSI volume handle</text>
+<path d="M240,275 L240,315" class="line"/>
+<rect x="30" y="325" width="420" height="80" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="352" text-anchor="middle" class="">CSI provisioner / driver</text>
+<text x="240.0" y="375" text-anchor="middle" class="">Provision, attach, delete operations</text>
+<path d="M240,405 L240,444" class="line"/>
+<rect x="30" y="454" width="420" height="80" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="481" text-anchor="middle" class="">Longhorn volume</text>
+<text x="240.0" y="504" text-anchor="middle" class="">Backend identity from the PV handle</text>
+<path d="M240,534 L240,573" class="line"/>
+<rect x="30" y="583" width="420" height="80" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="610" text-anchor="middle" class="">Replica storage on disks</text>
+<text x="240.0" y="633" text-anchor="middle" class="">Separate from Kubernetes API records</text>
+<rect x="30" y="701" width="420" height="85" rx="8" fill="#e7e2d2" stroke="#b2c4be"/>
+<text x="240.0" y="728" text-anchor="middle" class="">StorageClass → provisioning policy</text>
+<text x="240.0" y="751" text-anchor="middle" class="">Provisioner, parameters, reclaim default</text>
+<text x="240" y="817" text-anchor="middle" class="small">StorageClass configures provisioning;</text>
+<text x="240" y="841" text-anchor="middle" class="small">it is not a hop between PV and disk.</text>
+<text x="240" y="886" text-anchor="middle" class="">Deleting a PVC can destroy backing data.</text>
+<text x="240" y="915" text-anchor="middle" class="">Bypassing finalizers can instead orphan it.</text>
+</svg>

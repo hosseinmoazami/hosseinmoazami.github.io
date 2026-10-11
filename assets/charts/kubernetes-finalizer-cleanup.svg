@@ -1,0 +1,43 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 875" role="img" aria-labelledby="title desc"><title id="title">Normal and forced finalizer cleanup</title><desc id="desc">Deletion sets a deletion timestamp. With no remaining finalizers, deletion can complete subject to grace periods. Normally controllers fulfill cleanup obligations; manually clearing finalizers bypasses that work and can orphan backend resources.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#526777"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;fill:#203c4a;font-size:17px}.title{font-size:21px;font-weight:700}.small{font-size:15px}.line{stroke:#526777;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<rect width="480" height="875" rx="12" fill="#f4f3ee"/>
+<text x="240" y="34" text-anchor="middle" class="title">Finalizers record pending obligations</text>
+<rect x="30" y="60" width="420" height="80" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="87" text-anchor="middle" class="">kubectl delete</text>
+<text x="240.0" y="110" text-anchor="middle" class="">deletionTimestamp is set</text>
+<path d="M240,140 L240,170" class="line"/>
+<rect x="30" y="180" width="420" height="80" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="207" text-anchor="middle" class="">Are finalizers still present?</text>
+<path d="M30,220 L12,220 L12,713 L29,713" class="line"/>
+<text x="86" y="300" text-anchor="middle" class="small">No</text>
+<path d="M240,260 L240,290 L130,290 L130,330" class="line"/>
+<path d="M240,290 L355,290 L355,330" class="line"/>
+<text x="240" y="317" text-anchor="middle" class="small">Yes</text>
+<rect x="30" y="340" width="200" height="104" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="130.0" y="367" text-anchor="middle" class="small">Normal path</text>
+<text x="130.0" y="390" text-anchor="middle" class="small">Controller handles</text>
+<text x="130.0" y="413" text-anchor="middle" class="small">cleanup obligation</text>
+<rect x="250" y="340" width="210" height="104" rx="8" fill="#f1e0d9" stroke="#b2c4be"/>
+<text x="355.0" y="367" text-anchor="middle" class="small">Forced bypass</text>
+<text x="355.0" y="390" text-anchor="middle" class="small">Operator clears</text>
+<text x="355.0" y="413" text-anchor="middle" class="small">finalizer keys</text>
+<path d="M130,444 L130,480" class="line"/>
+<path d="M355,444 L355,480" class="line"/>
+<rect x="30" y="490" width="200" height="104" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="130.0" y="517" text-anchor="middle" class="small">Required cleanup</text>
+<text x="130.0" y="540" text-anchor="middle" class="small">finishes; controller</text>
+<text x="130.0" y="563" text-anchor="middle" class="small">removes its key</text>
+<rect x="250" y="490" width="210" height="104" rx="8" fill="#f1e0d9" stroke="#b2c4be"/>
+<text x="355.0" y="517" text-anchor="middle" class="small">Cleanup may not run</text>
+<text x="355.0" y="540" text-anchor="middle" class="small">Backend artifacts</text>
+<text x="355.0" y="563" text-anchor="middle" class="small">can remain</text>
+<path d="M130,594 L130,630 L240,630 L240,663" class="line"/>
+<path d="M355,594 L355,630 L240,630" class="line"/>
+<rect x="30" y="673" width="420" height="80" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="700" text-anchor="middle" class="">All keys cleared + grace period complete</text>
+<text x="240.0" y="723" text-anchor="middle" class="">Object can leave the API</text>
+<path d="M240,753 L240,780" class="line"/>
+<text x="253" y="810" text-anchor="middle" class="title">API object gone ≠ backend verified</text>
+<text x="240" y="849" text-anchor="middle" class="small">Namespace spec.finalizers uses a separate path.</text>
+</svg>
