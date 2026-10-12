@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 880" role="img" aria-labelledby="title desc"><title id="title">Disk-full investigation flow</title><desc id="desc">Check block and inode pressure, scan the affected mount, check open deleted files, and follow either Docker object cleanup or Elasticsearch index deletion. Verify capacity and service health afterwards.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#526777"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;fill:#203c4a;font-size:17px}.title{font-size:21px;font-weight:700}.small{font-size:15px}.line{stroke:#526777;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<rect width="480" height="880" rx="12" fill="#f4f3ee"/>
+<text x="240" y="34" text-anchor="middle" class="title">Disk full: investigate before deleting</text>
+<rect x="30" y="60" width="420" height="86" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="87" text-anchor="middle" class="">df -h + df -i</text>
+<text x="240.0" y="110" text-anchor="middle" class="">Which mount and which resource is full?</text>
+<path d="M240,146 L240,175" class="line"/>
+<rect x="30" y="185" width="420" height="86" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="212" text-anchor="middle" class="">du → drill down → find / ncdu</text>
+<text x="240.0" y="235" text-anchor="middle" class="">Keep the scan on the affected filesystem</text>
+<path d="M240,271 L240,300" class="line"/>
+<rect x="30" y="310" width="420" height="86" rx="8" fill="#e7e2d2" stroke="#b2c4be"/>
+<text x="240.0" y="337" text-anchor="middle" class="">df remains high but files are missing?</text>
+<text x="240.0" y="360" text-anchor="middle" class="">lsof +L1 → review open deleted files</text>
+<path d="M240,396 L240,425 L125,425 L125,453" class="line"/>
+<path d="M240,425 L355,425 L355,453" class="line"/>
+<rect x="20" y="463" width="210" height="104" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="125.0" y="490" text-anchor="middle" class="small">Docker objects</text>
+<text x="125.0" y="513" text-anchor="middle" class="small">system df -v</text>
+<text x="125.0" y="536" text-anchor="middle" class="small">Review prune scope</text>
+<rect x="250" y="463" width="210" height="104" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="355.0" y="490" text-anchor="middle" class="small">Elasticsearch volume</text>
+<text x="355.0" y="513" text-anchor="middle" class="small">Map UUIDs via API</text>
+<text x="355.0" y="536" text-anchor="middle" class="small">Review snapshots</text>
+<path d="M125,567 L125,601" class="line"/>
+<path d="M355,567 L355,601" class="line"/>
+<rect x="20" y="611" width="210" height="104" rx="8" fill="#f1e0d9" stroke="#b2c4be"/>
+<text x="125.0" y="638" text-anchor="middle" class="small">Choose scoped cleanup</text>
+<text x="125.0" y="661" text-anchor="middle" class="small">If layers are missing:</text>
+<text x="125.0" y="684" text-anchor="middle" class="small">recover, do not prune</text>
+<rect x="250" y="611" width="210" height="104" rx="8" fill="#f1e0d9" stroke="#b2c4be"/>
+<text x="355.0" y="638" text-anchor="middle" class="small">Delete reviewed index</text>
+<text x="355.0" y="661" text-anchor="middle" class="small">through Elasticsearch</text>
+<text x="355.0" y="684" text-anchor="middle" class="small">Never remove shards</text>
+<path d="M125,715 L125,743 L240,743 L240,768" class="line"/>
+<path d="M355,715 L355,743 L240,743" class="line"/>
+<rect x="30" y="778" width="420" height="86" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="805" text-anchor="middle" class="">Recheck df + Docker / cluster health</text>
+<text x="240.0" y="828" text-anchor="middle" class="">Fix retention and capacity monitoring</text>
+</svg>

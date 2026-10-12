@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 740" role="img" aria-labelledby="title desc"><title id="title">Who owns the stored bytes?</title><desc id="desc">Docker manages images, layers and cache. Volumes may contain persistent application data. Elasticsearch owns index deletion inside its volume. Inspect sizes without deleting managed filesystem contents.</desc>
+<defs><marker id="arrow" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0,0 L8,4 L0,8" fill="#526777"/></marker></defs>
+<style>text{font-family:system-ui,sans-serif;fill:#203c4a;font-size:17px}.title{font-size:21px;font-weight:700}.small{font-size:15px}.line{stroke:#526777;stroke-width:2;fill:none;marker-end:url(#arrow)}</style>
+<rect width="480" height="740" rx="12" fill="#f4f3ee"/>
+<text x="240" y="34" text-anchor="middle" class="title">Who owns the stored bytes?</text>
+<rect x="30" y="60" width="420" height="86" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="240.0" y="87" text-anchor="middle" class="">Linux filesystem</text>
+<text x="240.0" y="110" text-anchor="middle" class="">df → capacity · du → directory usage</text>
+<path d="M240,146 L240,175 L125,175 L125,201" class="line"/>
+<path d="M240,175 L355,175 L355,201" class="line"/>
+<rect x="20" y="211" width="210" height="104" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="125.0" y="238" text-anchor="middle" class="small">Docker layers / cache</text>
+<text x="125.0" y="261" text-anchor="middle" class="small">Image + writable layers</text>
+<text x="125.0" y="284" text-anchor="middle" class="small">Managed by Docker</text>
+<rect x="250" y="211" width="210" height="104" rx="8" fill="#e7e2d2" stroke="#b2c4be"/>
+<text x="355.0" y="238" text-anchor="middle" class="small">Docker volume</text>
+<text x="355.0" y="261" text-anchor="middle" class="small">Persistent app data</text>
+<text x="355.0" y="284" text-anchor="middle" class="small">Not disposable cache</text>
+<path d="M125,315 L125,349" class="line"/>
+<path d="M355,315 L355,349" class="line"/>
+<rect x="20" y="359" width="210" height="104" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="125.0" y="386" text-anchor="middle" class="small">Review Docker objects</text>
+<text x="125.0" y="409" text-anchor="middle" class="small">Use scoped CLI cleanup</text>
+<text x="125.0" y="432" text-anchor="middle" class="small">Never edit overlay2</text>
+<rect x="250" y="359" width="210" height="104" rx="8" fill="#e3eeeb" stroke="#b2c4be"/>
+<text x="355.0" y="386" text-anchor="middle" class="small">Elasticsearch data</text>
+<text x="355.0" y="409" text-anchor="middle" class="small">UUID → index name</text>
+<text x="355.0" y="432" text-anchor="middle" class="small">Check retention</text>
+<path d="M355,463 L355,497" class="line"/>
+<rect x="250" y="507" width="210" height="104" rx="8" fill="#f1e0d9" stroke="#b2c4be"/>
+<text x="355.0" y="534" text-anchor="middle" class="small">Verify snapshot</text>
+<text x="355.0" y="557" text-anchor="middle" class="small">Delete exact index</text>
+<text x="355.0" y="580" text-anchor="middle" class="small">through its API</text>
+<text x="129" y="530" text-anchor="middle" class="small">Broken layers?</text>
+<text x="129" y="555" text-anchor="middle" class="small">Rebuild / restore.</text>
+<text x="129" y="580" text-anchor="middle" class="small">Prune is not repair.</text>
+<text x="240" y="656" text-anchor="middle" class="">Volume prune can delete application data.</text>
+<text x="240" y="687" text-anchor="middle" class="">A large path is not proof of disposable data.</text>
+<text x="240" y="719" text-anchor="middle" class="small">Inspect first; let the owner perform cleanup.</text>
+</svg>

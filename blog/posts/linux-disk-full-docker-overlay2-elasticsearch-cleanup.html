@@ -1,0 +1,393 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Find disk consumers, diagnose damaged Docker layers, and reclaim Elasticsearch storage through supported APIs.">
+  <meta name="author" content="Hossein Moazami">
+  <meta name="theme-color" content="#091521">
+  <link rel="canonical" href="https://hossein.cloud/blog/posts/linux-disk-full-docker-overlay2-elasticsearch-cleanup.html">
+  <meta property="og:type" content="article">
+  <meta property="og:title" content="Linux Disk Full: Docker and Elasticsearch Cleanup">
+  <meta property="og:description" content="Find disk consumers, diagnose damaged Docker layers, and reclaim Elasticsearch storage through supported APIs.">
+  <meta property="og:url" content="https://hossein.cloud/blog/posts/linux-disk-full-docker-overlay2-elasticsearch-cleanup.html">
+  <meta property="og:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Hossein Moazami — DevOps and Platform Engineer">
+  <meta property="article:published_time" content="2026-10-12">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Linux Disk Full: Docker and Elasticsearch Cleanup">
+  <meta name="twitter:description" content="Find disk consumers, diagnose damaged Docker layers, and reclaim Elasticsearch storage through supported APIs.">
+  <meta name="twitter:image" content="https://hossein.cloud/assets/og-card.png">
+  <meta name="twitter:image:alt" content="Hossein Moazami — DevOps and Platform Engineer">
+  <!-- PAGE_TITLE: concise browser/share title; TITLE: full article headline. -->
+  <title>Linux Disk Full: Docker and Elasticsearch Cleanup — Hossein Moazami</title>
+  <link rel="icon" href="../../assets/favicon.ico" sizes="any">
+  <link rel="icon" type="image/png" href="../../assets/favicon-32x32.png" sizes="32x32">
+  <link rel="alternate" type="application/rss+xml" title="Hossein Moazami Field Notes" href="../../feed.xml">
+  <link rel="stylesheet" href="../../assets/style.css?v=a522849802df">
+  <script src="../../assets/article-toc.js?v=0809d5e33473" defer></script>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"BlogPosting","headline":"Linux Disk Full: Docker overlay2 and Elasticsearch Cleanup Runbook","datePublished":"2026-10-12","author":{"@type":"Person","name":"Hossein Moazami","url":"https://hossein.cloud/"},"mainEntityOfPage":"https://hossein.cloud/blog/posts/linux-disk-full-docker-overlay2-elasticsearch-cleanup.html","image":"https://hossein.cloud/assets/og-card.png","description":"Find disk consumers, diagnose damaged Docker layers, and reclaim Elasticsearch storage through supported APIs."}</script>
+</head>
+<body>
+  <a class="skip-link" href="#main">Skip to content</a>
+  <header class="site-header wrap">
+    <a class="brand" href="/" aria-label="hossein.cloud — Home"><span class="brand-mark" aria-hidden="true">h.</span><span class="brand-name">hossein.cloud</span></a>
+    <nav class="nav" aria-label="Main navigation"><a href="/#work">Work</a><a href="/blog/" aria-current="location">Writing</a><a href="../../resume.html">Résumé</a><a class="nav-contact" href="/#contact">Contact</a></nav>
+  </header>
+  <main id="main" class="article-shell article-shell--toc">
+    <a class="back-link" href="/blog/"><span aria-hidden="true">←</span> All field notes</a>
+    <article class="article-layout--toc">
+      <header class="article-header"><div class="post-meta"><span class="post-tag">Linux</span><time datetime="2026-10-12">October 12, 2026</time><span aria-hidden="true">/</span><span>15 min read</span></div><h1>Linux Disk Full: Docker overlay2 and Elasticsearch Cleanup Runbook</h1><p class="article-lead">Find disk consumers, diagnose damaged Docker layers, and reclaim Elasticsearch storage through supported APIs.</p><p class="article-byline">By Hossein Moazami · DevOps &amp; Platform Engineer</p></header>
+      <aside class="article-toc" aria-label="Table of contents" data-article-toc>
+        <details open>
+          <summary><span id="toc-title" class="article-toc-title">Jump to</span><span class="article-toc-count">17 sections</span><span class="article-toc-icon" aria-hidden="true"></span></summary>
+          <nav class="article-toc-nav" aria-labelledby="toc-title">
+            <ol class="article-toc-list">
+              <li><a href="#overview">Problem Overview</a></li>
+              <li><a href="#filesystem">Check Which Filesystem Is Full</a></li>
+              <li><a href="#directories">Find the Largest Directories</a></li>
+              <li><a href="#large-files">Find Large Individual Files</a></li>
+              <li><a href="#ncdu">Use ncdu for Interactive Investigation</a></li>
+              <li><a href="#overlay-warning">Never Manually Delete overlay2</a></li>
+              <li><a href="#docker-cleanup">Reclaim Docker Space Through Docker</a></li>
+              <li><a href="#docker-recovery">Recover After Manual Layer Deletion</a></li>
+              <li><a href="#elasticsearch-volume">Investigate the Elasticsearch Volume</a></li>
+              <li><a href="#elasticsearch-warning">Never Delete Index Directories Directly</a></li>
+              <li><a href="#map-indices">Map UUIDs to Elasticsearch Index Names</a></li>
+              <li><a href="#delete-indices">Delete Reviewed Indices Through Elasticsearch</a></li>
+              <li><a href="#dangerous-pipelines">Recognize Dangerous Largest-Directory Pipelines</a></li>
+              <li><a href="#deleted-open-files">Deleted Files Still Consuming Space</a></li>
+              <li><a href="#runbook">Recommended Disk-Full Sequence</a></li>
+              <li><a href="#lessons">Operational Lessons</a></li>
+              <li><a href="#quick-reference">Quick Command Reference</a></li>
+            </ol>
+            <a class="article-toc-top" href="#main">Back to top <span aria-hidden="true">↑</span></a>
+          </nav>
+        </details>
+      </aside>
+      <div class="article-body">
+        <h2 id="overview">1. Problem Overview</h2>
+
+        <p>A filesystem reached capacity. Investigation led through large directories into Docker storage and an Elasticsearch volume. Manually removing Docker layer directories then introduced a second problem: Docker metadata referred to files that no longer existed, causing build failures such as:</p>
+
+        <pre tabindex="0" aria-label="Example missing Docker layer error"><code class="language-text">ERROR: stat /var/lib/docker/overlay2/&lt;layer-id&gt;: no such file or directory</code></pre>
+
+        <p>Treat disk pressure and storage corruption as separate problems. Reclaiming bytes does not repair missing layers. This runbook starts with observation, then uses the storage owner’s cleanup mechanism. Commands target a Linux host with GNU tools and Bash; replace placeholders before running them. Docker commands must target the same host you are inspecting, not a remote context.</p>
+
+        <h2 id="filesystem">2. Check Which Filesystem Is Full</h2>
+
+        <pre tabindex="0" aria-label="Check block and inode capacity"><code class="language-bash">df -h
+df -i
+df -h /var/lib/docker</code></pre>
+
+        <p>In <code>df -h</code>, inspect <code>Use%</code>, <code>Avail</code>, and <code>Mounted on</code>. Near 100% with little available space indicates block-space pressure. <code>df -i</code> checks inode availability: a filesystem can run out of file entries even with free bytes. Inode reporting varies by filesystem. A path argument identifies the filesystem containing that path; substitute the actual data location.</p>
+
+        <p>Repeated overlay mounts in <code>df</code> can report the same backing capacity. Do not add them together. If the full mount is separate from <code>/</code>, start subsequent scans at that mount. If both bytes and inodes look healthy, investigate quotas, filesystem errors, and the exact path in the failing write.</p>
+
+        <h2 id="directories">3. Find the Largest Directories</h2>
+
+        <p>For a quick top-level overview, show totals in ascending order or largest first:</p>
+
+        <pre tabindex="0" aria-label="Rank top-level directory usage"><code class="language-bash">sudo du -sh /* 2&gt;/dev/null | sort -h
+sudo du -sh /* 2&gt;/dev/null | sort -rh</code></pre>
+
+        <div class="reference-table" role="region" aria-label="Directory command flags" tabindex="0"><table><thead><tr><th scope="col">Flag</th><th scope="col">Meaning</th></tr></thead><tbody><tr><td><code>du -s</code></td><td>Summarize each supplied path.</td></tr><tr><td><code>du -h</code></td><td>Display readable sizes.</td></tr><tr><td><code>sort -h</code></td><td>Sort human-readable size values.</td></tr><tr><td><code>sort -rh</code></td><td>Reverse that ordering: largest first.</td></tr><tr><td><code>2&gt;/dev/null</code></td><td>Hide diagnostic messages, including real read errors.</td></tr></tbody></table></div>
+
+        <p>These broad scans cross mount boundaries and the shell’s <code>*</code> omits hidden entries. Suppressing errors makes output quieter, not complete. For a more focused root-filesystem scan, use GNU du’s one-filesystem and one-level options:</p>
+
+        <pre tabindex="0" aria-label="Inspect one filesystem including hidden entries"><code class="language-bash">sudo du -xhd1 / | sort -rh</code></pre>
+
+        <p><code>-x</code> avoids descending onto a different filesystem; <code>-d1</code> reports the root and immediate child totals. The root total is included, so it will usually be the largest line. Mounts and bind mounts still require interpretation. See the <a href="https://www.gnu.org/software/coreutils/manual/html_node/du-invocation.html">GNU du reference</a>.</p>
+
+        <p>Drill into the largest branch, rather than repeatedly scanning everything:</p>
+
+        <pre tabindex="0" aria-label="Progressively inspect var and Docker storage"><code class="language-bash">sudo du -sh /var/* 2&gt;/dev/null | sort -rh
+sudo du -sh /var/lib/* 2&gt;/dev/null | sort -rh
+sudo du -sh /var/lib/docker/* 2&gt;/dev/null | sort -rh</code></pre>
+
+        <p>The shell expands wildcards <em>before</em> sudo runs. If your account cannot list a protected directory, the last command can miss everything. This alternative lets privileged du enumerate the directory itself, includes hidden entries, and keeps errors visible:</p>
+
+        <pre tabindex="0" aria-label="Inspect protected Docker directories without a shell glob"><code class="language-bash">sudo du -xhd1 /var/lib/docker | sort -rh</code></pre>
+
+        <p>Replace the path if Docker uses a different data root. <code>du</code> measures reachable allocated file blocks; <code>df</code> measures filesystem accounting. Open-but-deleted files, metadata, reservations, snapshots, shared extents, and different mount boundaries can explain discrepancies. Large scans create I/O load; narrow the scope on busy hosts.</p>
+
+        <h2 id="large-files">4. Find Large Individual Files</h2>
+
+        <p>List regular files larger than 1 GiB on the root filesystem:</p>
+
+        <pre tabindex="0" aria-label="Find files larger than one GiB"><code class="language-bash">sudo find / -xdev -type f -size +1G -print 2&gt;/dev/null</code></pre>
+
+        <p><code>-xdev</code> stays on the starting filesystem, <code>-type f</code> selects regular files, and GNU find’s <code>G</code> uses 1,073,741,824-byte units. For a separate data filesystem, replace <code>/</code> with its mount point.</p>
+
+        <p>For a largest-first report with readable byte counts:</p>
+
+        <pre tabindex="0" aria-label="Display twenty largest files by apparent size"><code class="language-bash">sudo find / -xdev -type f -printf '%s %p\n' 2&gt;/dev/null \
+  | sort -nr \
+  | head -n 20 \
+  | numfmt --field=1 --to=iec</code></pre>
+
+        <p><code>%s</code> is apparent length in bytes, which can greatly exceed allocated space for sparse files. <code>sort -nr</code> sorts numerically in reverse; <code>numfmt</code> converts the first field for display. This line-oriented report is for human review, not deletion: filenames containing newlines can break its records. Sorting huge inventories may require temporary space; narrow the scan or use a healthy scratch filesystem. Re-run without error suppression when completeness matters.</p>
+
+        <h2 id="ncdu">5. Use ncdu for Interactive Investigation</h2>
+
+        <p>If not installed, use the appropriate package manager. Installing packages itself needs working disk space; do not attempt it on a completely full root filesystem.</p>
+
+        <pre tabindex="0" aria-label="Install ncdu on Debian or Ubuntu"><code class="language-bash">sudo apt-get update
+sudo apt-get install ncdu</code></pre>
+
+        <pre tabindex="0" aria-label="Install ncdu on RHEL-family systems"><code class="language-bash">sudo dnf install ncdu</code></pre>
+
+        <p>Package availability depends on enabled repositories; some RHEL-family releases require an additional repository such as EPEL. Browse with arrows and Enter, then quit with <code>q</code>:</p>
+
+        <pre tabindex="0" aria-label="Browse filesystem usage interactively"><code class="language-bash">sudo ncdu /</code></pre>
+
+        <p>Normal ncdu can delete files. Prefer read-only browsing constrained to one filesystem for an incident investigation:</p>
+
+        <pre tabindex="0" aria-label="Read-only ncdu scan on one filesystem"><code class="language-bash">sudo ncdu -x -r /</code></pre>
+
+        <p><code>-x</code> avoids crossing filesystems; <code>-r</code> disables deletion. Point it at the full mount or a suspect subtree to reduce scan time.</p>
+
+        <h2 id="overlay-warning">6. Never Manually Delete overlay2</h2>
+
+        <p><strong>Do not modify Docker-managed layer files to reclaim space.</strong> With the classic overlay2 driver, <code>/var/lib/docker/overlay2/</code> contains image and container filesystem layers tied to daemon metadata. Removing a directory breaks those references; a running container may fail later even if it initially appears healthy.</p>
+
+        <pre tabindex="0" aria-label="Anti-pattern: direct deletion of Docker layers"><code class="language-bash"># DO NOT RUN — this destroys Docker-managed layers:
+# sudo rm -rf /var/lib/docker/overlay2/*</code></pre>
+
+        <p>The missing-layer error in this runbook is consistent with that damage, but the same error should also prompt checks for a missing mount, wrong data root, or filesystem failure. Do not create empty replacement layer directories or delete more internals to silence it.</p>
+
+        <pre tabindex="0" aria-label="Confirm Docker context, root directory and storage driver"><code class="language-bash">docker context show
+docker info</code></pre>
+
+        <p>Read <code>Docker Root Dir</code> and <code>Storage Driver</code>. Not every installation uses overlay2: Docker’s containerd image store can keep images and snapshots under <code>/var/lib/containerd</code>, and rootless or customized installations use other paths. The reset procedure below is deliberately limited to a classic overlay2 host. See <a href="https://docs.docker.com/engine/daemon/">Docker’s storage-location documentation</a>.</p>
+
+        <figure class="memory-figure"><a href="../../assets/charts/disk-storage-ownership.svg" aria-label="Open full-size diagram: Storage ownership and supported cleanup boundaries"><img src="../../assets/charts/disk-storage-ownership.svg" width="480" height="740" alt="Storage ownership and supported cleanup boundaries" loading="lazy"></a><figcaption>The largest directory identifies where bytes live. It does not tell you which files are disposable.</figcaption></figure>
+
+        <h2 id="docker-cleanup">7. Reclaim Docker Space Through Docker</h2>
+
+        <p>Keep the daemon running for CLI inspection and cleanup. First review the local inventory and mount associations:</p>
+
+        <pre tabindex="0" aria-label="Inspect Docker disk consumers and container mounts"><code class="language-bash">docker system df
+docker system df -v
+docker ps -a --size
+docker image ls
+docker volume ls
+docker inspect --format '&#123;&#123;json .Mounts&#125;&#125;' '&lt;container_id&gt;'</code></pre>
+
+        <p>The verbose report distinguishes images, containers, local volumes, and build cache. Shared layers complicate sums, and container writable-layer size does not include all logs, bind mounts, or volume data. “Reclaimable” means Docker considers an object unused; it does not mean its contents are unimportant.</p>
+
+        <div class="reference-table" role="region" aria-label="Docker cleanup scope" tabindex="0"><table><thead><tr><th scope="col">Command</th><th scope="col">Removal scope / consequence</th></tr></thead><tbody><tr><td><code>docker container prune</code></td><td>All stopped containers, including their writable layers and local container state.</td></tr><tr><td><code>docker image prune</code></td><td>Dangling images by default; tagged but unused images remain.</td></tr><tr><td><code>docker builder prune</code></td><td>Dangling build cache by default; <code>-a</code> widens to all unused build cache. Future builds may be slower.</td></tr><tr><td><code>docker volume prune</code></td><td>On current Engines, unused anonymous local volumes; persistent data can be lost.</td></tr><tr><td><code>docker system prune</code></td><td>Stopped containers, unused networks, dangling images, and unused build cache. Volumes excluded by default.</td></tr><tr><td><code>docker system prune -a</code></td><td>The same categories, plus all images not associated with a container, including tagged images.</td></tr></tbody></table></div>
+
+        <p><strong>Destructive choices, not a sequence:</strong> review the affected category and command’s confirmation prompt before selecting one. Prune has no general-purpose dry-run mode. These examples intentionally omit <code>-f</code>, which would skip confirmation.</p>
+
+        <pre tabindex="0" aria-label="Choose one reviewed container, image or cache cleanup"><code class="language-bash">docker container prune
+docker image prune
+docker builder prune</code></pre>
+
+        <p><strong>Persistent-data risk:</strong> on current Engines, this deletes anonymous local volumes referenced by no container. Stopped containers still count as references until removed. Removing containers first can make their volumes eligible for a later prune.</p>
+
+        <pre tabindex="0" aria-label="Destructive: remove eligible anonymous volumes"><code class="language-bash">docker volume prune</code></pre>
+
+        <p>Check the installed version and help before relying on these defaults. Older Engines differ. Current <code>docker volume prune --all</code> also includes unused <em>named</em> volumes, so a name is not protection. See the <a href="https://docs.docker.com/reference/cli/docker/volume/prune/">volume prune reference</a> and <a href="https://docs.docker.com/reference/cli/docker/builder/prune/">builder prune options</a>.</p>
+
+        <p><strong>Broader destructive cleanup:</strong> choose one only if every affected category in the table is disposable. Neither command reconstructs missing layers.</p>
+
+        <pre tabindex="0" aria-label="Choose a reviewed system-wide prune scope"><code class="language-bash">docker system prune
+# More aggressive alternative:
+docker system prune -a</code></pre>
+
+        <p>Adding <code>--volumes</code> to system prune also targets eligible anonymous volumes on current Engines; <code>-a</code> expands image removal, not volume removal to all named volumes. Avoid combining volume cleanup with a broad prune during storage diagnosis. The <a href="https://docs.docker.com/reference/cli/docker/system/prune/">system prune reference</a> defines the exact scope. Prefer a reviewed single-object removal when possible.</p>
+
+        <h2 id="docker-recovery">8. Recover After Manual Layer Deletion</h2>
+
+        <p>Inspect the daemon while it is available, and record failures before changing anything else:</p>
+
+        <pre tabindex="0" aria-label="Collect evidence of Docker storage inconsistency"><code class="language-bash">sudo systemctl status docker
+sudo journalctl -u docker --no-pager -n 200
+docker ps -a
+docker images
+docker system df</code></pre>
+
+        <p>Look for missing layer paths and filesystem or mount errors. Pruning is not a metadata repair tool. Affected images may need to be pulled or rebuilt and containers recreated from their original configuration; lost writable-layer data requires a backup. Re-pulling alone may not fix records that still claim a layer exists. Preserve volumes and bind-mounted application data independently, and avoid exporting known-damaged images as your only backup.</p>
+
+        <p><strong>Last resort: a fresh Docker store is an outage and a rebuild, not routine disk cleanup.</strong> Use the following only for a standalone, rootful Linux host where you verified classic overlay2, the default data root, a dedicated containerd service, and a data-root directory that is not itself a mount point or symlink. Do not apply it to Kubernetes nodes, shared containerd services, Docker Desktop, Swarm nodes, or the containerd image store without an environment-specific recovery plan.</p>
+
+        <p>Before stopping services, obtain verified application backups, deployment definitions, and secrets from their proper stores. For Elasticsearch, use a successful repository snapshot; copying its data directory is not a supported backup. Gracefully stop all application containers through their deployment mechanism, including live-restore workloads, so no process continues writing. Expand capacity or recover space elsewhere if necessary.</p>
+
+        <pre tabindex="0" aria-label="Review the data-root filesystem and remaining mounts"><code class="language-bash">findmnt -T /var/lib/docker
+findmnt -R /var/lib/docker</code></pre>
+
+        <p>A data root that is a dedicated mount requires a different migration plan. Investigate any remaining container mounts; do not force-unmount a live workload. The next commands stop Docker’s socket activation as well as its service; stop containerd only under the dedicated-service assumption above.</p>
+
+        <pre tabindex="0" aria-label="Maintenance outage: stop the dedicated Docker runtime"><code class="language-bash">sudo systemctl stop docker.service docker.socket
+sudo systemctl stop containerd.service</code></pre>
+
+        <p>Do not run Docker CLI prune commands while the daemon is stopped. Check that all workload processes and mounts are quiescent before proceeding. Moving the store out of the way makes its local containers, images, cache, network metadata, and managed volumes unavailable to a fresh daemon; bind-mount contents outside it are not moved.</p>
+
+        <p><strong>Recovery-copy step:</strong> for the verified ordinary-directory layout only, use a new destination name and refuse to overwrite an existing recovery copy. Same-filesystem rename normally needs little extra space but <strong>reclaims no bytes</strong>. A move to another filesystem needs enough destination capacity and involves copying data.</p>
+
+        <pre tabindex="0" aria-label="Last resort: preserve the old store under a recovery name"><code class="language-bash">sudo test ! -e /var/lib/docker.recovery &amp;&amp;
+  sudo mv -- /var/lib/docker /var/lib/docker.recovery</code></pre>
+
+        <p>If the command fails, stop and investigate rather than continuing. A renamed corrupt store is evidence and a possible data source, not a guaranteed rollback or database backup. Only after the move succeeds and there is headroom for a new store, restart the dedicated runtime:</p>
+
+        <pre tabindex="0" aria-label="Start and verify a fresh Docker store"><code class="language-bash">sudo systemctl start containerd.service
+sudo systemctl start docker.service
+docker info
+docker ps -a</code></pre>
+
+        <p>Expect an empty local container inventory. Rebuild deployment state and restore application data through supported procedures before resuming traffic. Do not copy broken layer metadata into the new store. Keep the recovery directory until recovery and retention decisions are verified; disposing of it later permanently removes any remaining local volume data. This article intentionally provides no blanket deletion command for it.</p>
+
+        <h2 id="elasticsearch-volume">9. Investigate the Elasticsearch Volume</h2>
+
+        <p>First confirm the actual volume mount rather than assuming a path. These commands inspect metadata, not document contents:</p>
+
+        <pre tabindex="0" aria-label="Locate the Elasticsearch volume mount"><code class="language-bash">docker inspect --format '&#123;&#123;json .Mounts&#125;&#125;' '&lt;container_id&gt;'
+docker volume inspect elasticsearch-data</code></pre>
+
+        <p>For a local volume, inspect the reported host mountpoint. The example below assumes the configured Elasticsearch data path has an <code>indices</code> child directly there. Older layouts can include <code>nodes/0/indices</code>; bind mounts, volume plugins, and custom data paths differ.</p>
+
+        <pre tabindex="0" aria-label="Example index-directory location"><code class="language-text">/var/lib/docker/volumes/elasticsearch-data/_data/indices/</code></pre>
+
+        <p>Read-only size inspection is useful. This variant expands the protected glob inside a privileged shell:</p>
+
+        <pre tabindex="0" aria-label="Show the largest index directories and their total"><code class="language-bash">sudo sh -c 'du -sh /var/lib/docker/volumes/elasticsearch-data/_data/indices/*' \
+  | sort -rh \
+  | head -n 10
+sudo du -sh /var/lib/docker/volumes/elasticsearch-data/_data/indices</code></pre>
+
+        <p>Directory names are generally internal index UUIDs, not names such as <code>application-logs-2026.09.01</code>. Replace the UUID placeholder to inspect its shard subdirectories:</p>
+
+        <pre tabindex="0" aria-label="Inspect one index UUID directory without modifying it"><code class="language-bash">sudo sh -c 'du -sh /var/lib/docker/volumes/elasticsearch-data/_data/indices/"&lt;index-uuid&gt;"/*' \
+  | sort -rh</code></pre>
+
+        <p>These are local-node observations while files may be changing. They need not equal cluster-wide API totals and do not establish that an index is safe to remove.</p>
+
+        <h2 id="elasticsearch-warning">10. Never Delete Index Directories Directly</h2>
+
+        <p><strong>Do not remove files from a live or stopped Elasticsearch data directory as a cleanup technique.</strong> Elasticsearch coordinates cluster metadata, shard state, translogs, and Lucene files. Direct removal can leave missing or corrupt shards and destroy data that is not recoverable from replicas.</p>
+
+        <pre tabindex="0" aria-label="Anti-pattern: removing an index UUID directory"><code class="language-bash"># DO NOT RUN — this bypasses Elasticsearch and can corrupt shards:
+# rm -rf /var/lib/docker/volumes/elasticsearch-data/_data/indices/"&lt;index-uuid&gt;"</code></pre>
+
+        <p>Use Elasticsearch’s deletion API. For backup and disaster recovery, use supported repository snapshots: raw filesystem copies are not a supported way to back up a cluster, even if Elasticsearch is stopped. See <a href="https://www.elastic.co/docs/deploy-manage/tools/snapshot-and-restore">snapshot and restore guidance</a>.</p>
+
+        <h2 id="map-indices">11. Map UUIDs to Elasticsearch Index Names</h2>
+
+        <p>The HTTP examples assume an intentionally unsecured local lab endpoint. For a secured cluster use its HTTPS URL, trusted CA, and an authorized credential workflow. Do not disable certificate checking or paste credentials into URLs. For example, curl can prompt for the password rather than putting it in shell history:</p>
+
+        <pre tabindex="0" aria-label="Example authenticated request with a password prompt"><code class="language-bash">curl --fail-with-body -sS --cacert /path/to/http_ca.crt \
+  --user '&lt;username&gt;' 'https://localhost:9200/_cat/indices?v'</code></pre>
+
+        <p>Use the hostname covered by the server certificate. The commands below use <code>--fail-with-body</code> (curl 7.76+) to return a failure status for HTTP errors while retaining their explanation; <code>-sS</code> suppresses the progress meter but shows errors. Keep the same TLS/authentication options for subsequent production requests.</p>
+
+        <pre tabindex="0" aria-label="List indices and match UUIDs in size order"><code class="language-bash">curl --fail-with-body -sS 'http://localhost:9200/_cat/indices?v'
+curl --fail-with-body -sS \
+  'http://localhost:9200/_cat/indices?v&amp;h=health,status,index,uuid,pri,rep,store.size,pri.store.size&amp;s=store.size:desc'</code></pre>
+
+        <p>Match <code>uuid</code> to the directory name. <code>store.size</code> covers primary and replica shards reported across the cluster; <code>pri.store.size</code> covers primaries. Local du totals can also include translog and other files outside the reported Lucene store metric. Hidden indices and permissions affect visibility; an unmatched directory is not permission to delete it. For an authorized review of hidden indices, add <code>expand_wildcards=all</code>. CAT output is intended for human inspection, not an automated deletion parser. See the <a href="https://www.elastic.co/docs/api/doc/elasticsearch/operation/operation-cat-indices">CAT indices reference</a>.</p>
+
+        <h2 id="delete-indices">12. Delete Reviewed Indices Through Elasticsearch</h2>
+
+        <p>List candidates by size, then review their purpose, retention requirements, ingestion dependencies, and recoverability. Size is not a retention policy.</p>
+
+        <pre tabindex="0" aria-label="Review index deletion candidates"><code class="language-bash">curl --fail-with-body -sS \
+  'http://localhost:9200/_cat/indices?v&amp;h=health,status,index,uuid,store.size&amp;s=store.size:desc'</code></pre>
+
+        <p><strong>Permanent data deletion:</strong> confirm a successful, restorable snapshot covers the exact index if recovery is required. Replace the placeholder with one explicit index name; avoid wildcards and <code>_all</code>. Elasticsearch, not the shell, must coordinate the removal:</p>
+
+        <pre tabindex="0" aria-label="Destructive: delete one explicitly reviewed Elasticsearch index"><code class="language-bash">curl --fail-with-body -sS -X DELETE 'http://localhost:9200/&lt;index_name&gt;'</code></pre>
+
+        <p>Expect an acknowledgment, then check API state and actual disk recovery. A failed response is not success. A data stream’s current write index cannot be deleted directly; manage rollover and backing-index retention through the appropriate lifecycle policy. An alias is not a substitute for an explicit target index. See the <a href="https://www.elastic.co/docs/api/doc/elasticsearch/v8/operation/operation-indices-delete">delete-index API</a>.</p>
+
+        <pre tabindex="0" aria-label="Verify index removal, node capacity and cluster health"><code class="language-bash">curl --fail-with-body -sS 'http://localhost:9200/_cat/indices?v'
+curl --fail-with-body -sS 'http://localhost:9200/_cat/allocation?v'
+curl --fail-with-body -sS 'http://localhost:9200/_cluster/health?pretty'
+df -h</code></pre>
+
+        <p>Reclamation may not be instantaneous. At flood-stage disk pressure, Elasticsearch can apply <code>read_only_allow_delete</code>; deleting an entire reviewed index is different from deleting documents. Fix capacity first rather than disabling disk safeguards. Current versions release the block when usage falls below the high watermark; check the <a href="https://www.elastic.co/docs/troubleshoot/elasticsearch/fix-watermark-errors">watermark troubleshooting guide</a> for the installed version.</p>
+
+        <h2 id="dangerous-pipelines">13. Recognize Dangerous Largest-Directory Pipelines</h2>
+
+        <p>This common dry run only prints paths; it performs no deletion. It assumes simple directory names without whitespace:</p>
+
+        <pre tabindex="0" aria-label="Display-only list of ten largest directory paths"><code class="language-bash">sudo du -sh /path/to/indices/* \
+  | sort -rh \
+  | head -n 10 \
+  | awk '{print $2}'</code></pre>
+
+        <p><code>awk</code> splits on whitespace, so this loses parts of paths containing spaces or tabs. Newlines are another problem. Even correctly parsed paths say nothing about ownership, snapshots, active writes, or recovery requirements.</p>
+
+        <p><strong>DANGEROUS — DO NOT USE AGAINST LIVE ELASTICSEARCH OR DOCKER-MANAGED DATA.</strong> The following is a recognition example, deliberately commented out so copying it does not run deletion:</p>
+
+        <pre tabindex="0" aria-label="Anti-pattern: converting disk usage output into recursive deletion"><code class="language-bash"># DO NOT RUN:
+# sudo du -sh /path/to/indices/* \
+#   | sort -rh \
+#   | head -n 10 \
+#   | awk '{print $2}' \
+#   | xargs sudo rm -rf</code></pre>
+
+        <p>Whitespace and quoting errors can select the wrong paths, and the filesystem can change between listing and removal. NUL-delimited handling would address some filename problems but would not make deleting managed storage valid. Keep discovery separate from a reviewed application-level action.</p>
+
+        <h2 id="deleted-open-files">14. Deleted Files Still Consuming Space</h2>
+
+        <p>A process can hold an unlinked file open. The pathname disappears, but its blocks remain allocated until the last reference is released. Look for open files with a link count below one:</p>
+
+        <pre tabindex="0" aria-label="Find deleted files that remain open"><code class="language-bash">sudo lsof +L1</code></pre>
+
+        <p>Inspect the process, device, file descriptor, and size. Match the device to the full filesystem; multiple descriptors can refer to the same file, so do not blindly sum sizes. If a service supports log reopening, use that documented operation; otherwise arrange a controlled restart. Verify that the reference disappears and <code>df</code> improves. Do not kill arbitrary processes or truncate database files through <code>/proc</code>.</p>
+
+        <p>A missing path in du does not mean the bytes are gone. Large rotated logs are a common case; a busy memory mapping or another descriptor can also keep an unlinked file alive.</p>
+
+        <h2 id="runbook">15. Recommended Disk-Full Sequence</h2>
+
+        <ol><li>Check <code>df -h</code> and <code>df -i</code>; identify the affected mount.</li><li>Rank directories on that filesystem and drill into the largest branch.</li><li>Find unusually large files and compare apparent size with allocated usage.</li><li>Check deleted-but-open files with <code>lsof +L1</code>.</li><li>For Docker storage, confirm the context and data root, then inspect <code>docker system df -v</code>.</li><li>Never edit overlay2. If layers were already removed, follow a recovery plan rather than expecting prune to repair them.</li><li>For Elasticsearch volumes, map local UUID directories to API index names and verify retention and snapshots.</li><li>Use one reviewed Docker cleanup action or delete the reviewed Elasticsearch index through its API.</li><li>Recheck filesystem capacity and application health; investigate discrepancies before repeating deletion.</li></ol>
+
+        <figure class="memory-figure"><a href="../../assets/charts/disk-full-decision-flow.svg" aria-label="Open full-size diagram: Disk-full investigation and recovery flow"><img src="../../assets/charts/disk-full-decision-flow.svg" width="480" height="880" alt="Disk-full investigation and recovery flow" loading="lazy"></a><figcaption>Measure first, identify the storage owner, and verify the service after cleanup. Corrupt layers require recovery, not more deletion.</figcaption></figure>
+
+        <pre tabindex="0" aria-label="Verify recovered capacity after Docker is running"><code class="language-bash">df -h
+df -i
+sudo du -sh /var/lib/docker
+docker system df</code></pre>
+
+        <p>Use the actual data root and full mount. Run Docker CLI checks only when its daemon is running. A full root filesystem can also disrupt logging, package management, databases, and service startup; verify those secondary failures after capacity is restored.</p>
+
+        <h2 id="lessons">16. Operational Lessons</h2>
+
+        <ul><li>Treat Docker’s internal store as daemon-managed state, not an ordinary folder to empty.</li><li>Separate disposable images and build cache from persistent volumes and writable-layer data.</li><li>Use database and search-engine APIs for deletion; index UUID directories are not disposable files.</li><li>Inspect before deleting. A dry run improves review but does not establish that data is safe to remove.</li><li>Monitor both bytes and inodes, growth rate, and time to exhaustion well before 100%.</li><li>Use log rotation, bounded build-cache retention, and Elasticsearch lifecycle policies to prevent recurrence.</li><li>Keep tested backups and enough spare capacity for snapshots, recovery, and normal filesystem work.</li></ul>
+
+        <h2 id="quick-reference">17. Quick Command Reference</h2>
+
+        <p>Read the linked destructive-action sections before running cleanup. This reference assumes the same host, data root, and local lab endpoint described above.</p>
+
+        <pre tabindex="0" aria-label="Filesystem usage and largest directories"><code class="language-bash">df -h
+df -i
+sudo du -xhd1 / | sort -rh
+sudo du -xhd1 /var | sort -rh</code></pre>
+
+        <pre tabindex="0" aria-label="Large files and deleted-but-open files"><code class="language-bash">sudo find / -xdev -type f -size +1G -print 2&gt;/dev/null
+sudo lsof +L1</code></pre>
+
+        <pre tabindex="0" aria-label="Docker disk usage"><code class="language-bash">docker system df
+docker system df -v</code></pre>
+
+        <p><strong>Destructive cache cleanup:</strong> only when the selected builder’s dangling cache can be discarded. Review the confirmation prompt; see <a href="#docker-cleanup">Docker cleanup scopes</a> for other categories.</p>
+
+        <pre tabindex="0" aria-label="Destructive: discard eligible build cache"><code class="language-bash">docker builder prune</code></pre>
+
+        <pre tabindex="0" aria-label="Elasticsearch index sizes and UUIDs"><code class="language-bash">curl --fail-with-body -sS \
+  'http://localhost:9200/_cat/indices?v&amp;h=index,uuid,store.size&amp;s=store.size:desc'</code></pre>
+
+        <p><strong>Permanent index deletion:</strong> use one reviewed exact name only after the <a href="#delete-indices">snapshot and retention checks</a>. No filesystem removal is involved.</p>
+
+        <pre tabindex="0" aria-label="Destructive: delete one reviewed index through its API"><code class="language-bash">curl --fail-with-body -sS -X DELETE 'http://localhost:9200/&lt;index_name&gt;'</code></pre>
+      </div>
+      <footer class="article-author"><p>Written by <strong>Hossein Moazami</strong><br>DevOps &amp; Platform Engineer</p><nav class="article-actions" aria-label="More from Hossein"><a class="text-link" href="/#work">Selected work <span aria-hidden="true">→</span></a><a class="text-link" href="../../resume.html">Résumé <span aria-hidden="true">→</span></a><a class="text-link" href="/#contact">Contact <span aria-hidden="true">→</span></a></nav></footer>
+      <a class="article-next" href="kubernetes-namespace-and-pvc-stuck-terminating-cleanup.html"><span><small>Continue reading</small><strong>Kubernetes Namespace and PVC Stuck in Terminating — Cleanup Runbook</strong></span><span aria-hidden="true">→</span></a>
+    </article>
+  </main>
+  <footer class="site-footer wrap"><p>© 2026 Hossein Moazami</p><div class="footer-links"><a href="/">Home</a><a href="https://github.com/hosseinmoazami" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span><span class="sr-only"> (opens in a new tab)</span></a><a href="mailto:hossein.moazami.goodarzi@gmail.com">Email</a></div></footer>
+</body>
+</html>
